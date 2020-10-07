@@ -39,7 +39,7 @@ bl_info = {
 
 
 def draw_button(self, context):
-    pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences    
+    #pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences    
     
     #if pref.button_toggle:
     if context.region.alignment == 'RIGHT':
@@ -59,43 +59,44 @@ class VPB_OT_RunBenchmark(Operator):
         return context.selected_objects
         
 
-    def set_view(self, degs, dist, angle, z):
-        #view_3d.view_location = (0.0 , 0.0 , z)
-        #view_3d.view_distance = dist
+    def set_view(self, view_3d, degrees, dist, angle, z):
+        view_3d.view_location = (0.0 , 0.0 , z)
+        view_3d.view_distance = dist
         eul = Euler((radians(angle), 0.0 , 0.0), 'XYZ')
         quat_ls = []
         
-        for i in range(degs):
+        for i in range(degrees):
             eul.z = radians(i)
             quat = eul.to_quaternion()
             quat_ls.append(list(quat))            
         return(quat_ls)
 
 
-    def spin_view(self, quat_ls1, degs, startAngle):
-        for i in range(degs):
-            #view_3d.view_rotation = quat_ls1[i+startAngle]
+    def spin_view(self, view_3d, quat_ls1, degrees, startAngle):
+        for i in range(degrees):
+            view_3d.view_rotation = quat_ls1[i+startAngle]
             bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
 
 
-    def refresh(self):
-        #view_3d.view_location = (0.0 , 0.0 , 1.0)
-        #view_3d.view_distance = 16
+    def refresh(self, view_3d):
+        view_3d.view_location = (0.0 , 0.0 , 1.0)
+        view_3d.view_distance = 16
         for i in range(5):
             bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)       
             
 
-    def bench(self, degs, dist, angle, z, timeout):    
-        a = self.set_view(degs, dist, angle, z)
+    def bench(self, view_3d, degrees, dist, angle, z, timeout):    
+        a = self.set_view(view_3d, degrees, dist, angle, z)
         t0 = t1 = time.time()
         degs1 = 0
-        if degs < 15:
-            step = degs
+        rotSteps = 15
+        if degrees < rotSteps:
+            step = degrees
         else:
-            step = 15
+            step = rotSteps
             
-        for i in range(0, degs, step):
-            self.spin_view(a, step, i)
+        for i in range(0, degrees, step):
+            self.spin_view(view_3d, a, step, i)
             t1 = time.time()
             degs1 += step
             if t1 - t0 > timeout:
@@ -105,31 +106,27 @@ class VPB_OT_RunBenchmark(Operator):
         return(round(fps, 2))
 
         
-    def execute(self, context):
-        area = ''
+    def execute(self, context):        
+        #create result file
+        bpy.ops.text.new()
+        bpy.data.texts['Text'].name = 'Benchmark_Result'
+        result = bpy.data.texts['Benchmark_Result']
+        #view_3d = ""
+
+        #set 3d view as context to run benchmark
         for window in bpy.context.window_manager.windows:
             screen = window.screen
-
             for area in screen.areas:
                 if area.type == 'VIEW_3D':
                     override = {'window': window, 'screen': screen, 'area': area}
-                    
-                    #override['area'] = area
-                    bpy.ops.screen.screen_full_area(override)
-                    break
+                    bpy.ops.screen.screen_full_area(override)   
 
-            #area.type = 'VIEW_3D'
             objOp = bpy.ops.object
             meshOp = bpy.ops.mesh
 
-            bpy.ops.text.new()
-            bpy.data.texts['Text'].name = 'Benchmark_Result'
-
-            result = bpy.data.texts['Benchmark_Result']
-
-
-            view_3d = bpy.context.screen.areas[0].spaces.active.region_3d
-
+            view_3d = bpy.context.screen.areas[0].spaces[0].region_3d
+            #view_3d = bpy.context.screen.areas[0].spaces.active.region_3d
+            
             width = bpy.context.area.width - 1
             height = bpy.context.area.height - 1
             scene = bpy.context.scene
@@ -138,15 +135,18 @@ class VPB_OT_RunBenchmark(Operator):
             #bpy.context.preferences.view.show_gizmo = False
             bpy.context.preferences.view.show_view_name = False
 
-
+            # specify benchmark target objects
             #benchTarget = bpy.data.objects['Suzanne']
             benchTarget =  bpy.data.objects[bpy.context.active_object.name]
             #body = bpy.data.objects['body']
             #robot = bpy.data.objects['robot']
 
             #view_parameters
-            benchTargetView = [3.0, 90.0, 1.0]
-            degs = 360
+            benchTargetView = [3.0, 60.0, 1.0]
+            distance = 3.0
+            angle = 60.0    
+            z = 1.0        
+            degrees = 360
             timeout = 10 
 
             timeov1 = time.time()
@@ -158,19 +158,20 @@ class VPB_OT_RunBenchmark(Operator):
             bpy.context.view_layer.objects.active = benchTarget
 
             #benchTarget - object mode - 4.2mln bench (5levels)
-            self.refresh()
+            self.refresh(view_3d)
             view.shading.type = 'WIREFRAME'
 
             benchTarget.modifiers.new(type='SUBSURF', name="subdiv")
             benchTarget.modifiers['subdiv'].levels = 1
 
-            self.refresh()
-            fps10 = self.bench(degs, benchTargetView[0], benchTargetView[1], benchTargetView[2], timeout) #objmode - wire - 4mln
+            self.refresh(view_3d)
+            # view_3d, degrees, dist, angle, z, timeout): 
+            fps10 = self.bench(view_3d, degrees, distance, angle, z, timeout)
 
             view.shading.type = 'SOLID'
 
-            self.refresh()
-            fps11 = self.bench(degs, benchTargetView[0], benchTargetView[1], benchTargetView[2], timeout) #objmode - solid - 4mln
+            self.refresh(view_3d)
+            fps11 = self.bench(view_3d, degrees, distance, angle, z, timeout)
 
             #benchTarget - edit mode 
             benchTarget.modifiers['subdiv'].levels = 1
@@ -180,22 +181,22 @@ class VPB_OT_RunBenchmark(Operator):
             #objOp.modifier_apply(modifier="subdiv")
             objOp.mode_set(mode='EDIT', toggle=False)
 
-            self.refresh()
-            fps12 = self.bench(degs, benchTargetView[0], benchTargetView[1], benchTargetView[2], timeout) #editmode - wire - 265k
+            self.refresh(view_3d)
+            fps12 = self.bench(view_3d, degrees, distance, angle, z, timeout)
             
-            #view.shading.type = 'MATERIAL'
+            view.shading.type = 'MATERIAL'
             
             
             view.shading.type = 'SOLID'
             view.shading.show_xray_wireframe = True
-            self.refresh()
-            fps13 = self.bench(degs, benchTargetView[0], benchTargetView[1], benchTargetView[2], timeout) #editmode - hiddenwire - 265k
+            self.refresh(view_3d)
+            fps13 = self.bench(view_3d, degrees, distance, angle, z, timeout)
 
 
             view.shading.show_xray_wireframe = False
-            #meshOp.select_all(action='SELECT')
-            self.refresh()
-            fps14 = self.bench(degs, benchTargetView[0], benchTargetView[1], benchTargetView[2], timeout) #editmode - solid - 265k
+            meshOp.select_all(action='SELECT')
+            self.refresh(view_3d)
+            fps14 = self.bench(view_3d, degrees, distance, angle, z, timeout)
 
             
         
@@ -234,7 +235,7 @@ class VPB_OT_RunBenchmark(Operator):
             result.write("Blender version: %s\nRevision: %s , %s\nPlatform: %s\n\n" % (version, hash, build_date, build_plat))
             result.write("RESULTS\n\n")
 
-            result.write("Object mode\n")
+            #result.write("Object mode\n")
             #result.write("Wireframe\n-benchTarget (4150 polys with 5 levels subsurf*, 4.2mln polys, 8.5mln tris): %.2f fps\n-bolts (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps10, fps20, fps41))
             #result.write("Solid\n-benchTarget (5 levels subsurf*): %.2f fps\n-bolts (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps11, fps21, fps42))
             #result.write("Material\n-robot (225k polys): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n\n" % (fps40, fps43))
@@ -244,7 +245,7 @@ class VPB_OT_RunBenchmark(Operator):
             result.write("Hiddenwire\n-benchTarget: %.2f fps\n\n" % fps13)
             result.write("Solid\n-benchTarget: %.2f fps\n\n\n" % fps14)
             
-            result.write("Sculpt mode\n")
+            #result.write("Sculpt mode\n")
             #result.write("Solid matcap\n-basemesh (25k polys with 4 levels multires, 6.5mln polys, 13mln tris): %.2f fps\n-basemesh (5 levels multires, 26mln polys, 52mln tris): %.2f fps\n\n\n" % (fps30, fps31))
             #result.write("Screen resolution : %s x %s\nVBOs: %s\nAnisotropic filter: %s\nDraw method: %s\nMulti sample: %s\nMipmaps: %s\nGPU Mipmap: %s\n" % (width, height, vbos, af, draw_met, view_aa, mip, mipgpu))
         
@@ -255,7 +256,7 @@ class VPB_OT_RunBenchmark(Operator):
             #result.write("Average FPS:",(fps11+fps12+fps13+fps14)/4)
             
             bpy.ops.screen.back_to_previous()
-            area.type = 'TEXT_EDITOR'
+            #area.type = 'TEXT_EDITOR'
             
             return {'FINISHED'}
 
