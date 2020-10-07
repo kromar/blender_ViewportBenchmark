@@ -82,7 +82,7 @@ class VPB_OT_RunBenchmark(Operator):
         view_3d.view_location = (0.0 , 0.0 , 1.0)
         view_3d.view_distance = 16
         for i in range(5):
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)       
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)  
             
 
     def bench(self, view_3d, degrees, distance, angle, z, timeout):    
@@ -108,8 +108,11 @@ class VPB_OT_RunBenchmark(Operator):
         
     def execute(self, context):        
         #create result file
-        bpy.ops.text.new()
-        bpy.data.texts['Text'].name = 'Benchmark_Result'
+        try:
+            bpy.data.texts['Benchmark_Result']
+        except:
+            bpy.ops.text.new()
+            bpy.data.texts['Text'].name = 'Benchmark_Result'
         result = bpy.data.texts['Benchmark_Result']
 
         #set 3d view as context to run benchmark
@@ -147,6 +150,9 @@ class VPB_OT_RunBenchmark(Operator):
             timeout = 10 
             mod_subdiv = 0
             timeov1 = time.time()
+            #unlock fps
+            user_fps = bpy.context.scene.render.fps
+            bpy.data.scenes['Scene'].render.fps = 9999
 
             #set benchTarget scene
             bpy.context.window.scene = bpy.data.scenes['Scene']
@@ -176,7 +182,6 @@ class VPB_OT_RunBenchmark(Operator):
             objOp.mode_set(mode='OBJECT', toggle=False)
             #objOp.modifier_apply(modifier="subdiv")
             objOp.mode_set(mode='EDIT', toggle=False)
-
             self.refresh(view_3d)
             fps12 = self.bench(view_3d, degrees, distance, angle, z, timeout)
             
@@ -187,7 +192,6 @@ class VPB_OT_RunBenchmark(Operator):
             view.shading.show_xray_wireframe = True
             self.refresh(view_3d)
             fps13 = self.bench(view_3d, degrees, distance, angle, z, timeout)
-
 
             
             # benchmark: 
@@ -229,32 +233,38 @@ class VPB_OT_RunBenchmark(Operator):
             #mipgpu = system.use_gpu_mipmap
 
             result.clear()
-            result.write("BLENDER VIEWPORT BENCHMARK\n\n")
+            result.write("BLENDER VIEWPORT BENCHMARK\n=================\n")
             result.write("Blender version: %s\nRevision: %s , %s\nPlatform: %s\n\n" % (version, hash, build_date, build_plat))
-            result.write("RESULTS\n\n")
 
+
+            result.write("SCORES BENCHMARKS\n=================\n")
             #result.write("Object mode\n")
-            #result.write("Wireframe\n-benchTarget (4150 polys with 5 levels subsurf*, 4.2mln polys, 8.5mln tris): %.2f fps\n-bolts (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps10, fps20, fps41))
-            #result.write("Solid\n-benchTarget (5 levels subsurf*): %.2f fps\n-bolts (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps11, fps21, fps42))
-            #result.write("Material\n-robot (225k polys): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n\n" % (fps40, fps43))
+            #result.write("Wireframe\n (4150 polys with 5 levels subsurf*, 4.2mln polys, 8.5mln tris): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps10, fps20, fps41))
+            #result.write("Solid\n (5 levels subsurf*): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps11, fps21, fps42))
+            #result.write("Material\n (225k polys): %.2f fps\n (1.5mln polys*): %.2f fps\n\n\n" % (fps40, fps43))
         
             result.write("Edit mode\n")
-            result.write("Wireframe\n-benchTarget: %.2f fps\n\n" % fps12)
-            result.write("Hiddenwire\n-benchTarget: %.2f fps\n\n" % fps13)
-            result.write("Solid\n-benchTarget: %.2f fps\n\n\n" % fps14)
+            result.write("bench 1\n %.2f fps\n\n" % fps10)
+            result.write("bench 1 \n %.2f fps\n\n" % fps11)
+            result.write("Wireframe\n %.2f fps\n\n" % fps12)
+            result.write("Hiddenwire\n %.2f fps\n\n" % fps13)
+            result.write("Solid\n %.2f fps\n\n\n" % fps14)
             
             #result.write("Sculpt mode\n")
-            #result.write("Solid matcap\n-basemesh (25k polys with 4 levels multires, 6.5mln polys, 13mln tris): %.2f fps\n-basemesh (5 levels multires, 26mln polys, 52mln tris): %.2f fps\n\n\n" % (fps30, fps31))
+            #result.write("Solid matcap\n (25k polys with 4 levels multires, 6.5mln polys, 13mln tris): %.2f fps\n (5 levels multires, 26mln polys, 52mln tris): %.2f fps\n\n\n" % (fps30, fps31))
             #result.write("Screen resolution : %s x %s\nVBOs: %s\nAnisotropic filter: %s\nDraw method: %s\nMulti sample: %s\nMipmaps: %s\nGPU Mipmap: %s\n" % (width, height, vbos, af, draw_met, view_aa, mip, mipgpu))
         
 
-        
-            result.write("Total Time: %i min %i sec\n\n" % (timeovmin, timeovsec))
-            #result.write("Average FPS:",((ps10+fps20+fps41+fps11+fps21+fps42+fps40+fps43+fps12+fps13+fps14+fps30+fps31)/13))
-            #result.write("Average FPS:",(fps11+fps12+fps13+fps14)/4)
+            avg_fps = (fps10+ fps11 + fps12 + fps13 + fps14)/5
+            total_fps = fps10+ fps11 + fps12 + fps13 + fps14
+            result.write("SCORE TOTAL\n=================\n")
+            result.write("FPS (avg/total): %.2f / %.2f\n" % (avg_fps, total_fps))
+            result.write("Time: %i min %i sec\n" % (timeovmin, timeovsec))
             
             bpy.ops.screen.back_to_previous()
-            #area.type = 'TEXT_EDITOR'
+            #restore user render fps settings
+            bpy.data.scenes['Scene'].render.fps = user_fps
+            area.type = 'TEXT_EDITOR'
             
             return {'FINISHED'}
 
