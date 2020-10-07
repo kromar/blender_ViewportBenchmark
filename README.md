@@ -1,4 +1,5 @@
 # ViewportBenchmark
+This addon runs a set of benchmarks to measure the vieport performance in different modes.
 
 ## How to run a ViewportBenchmark
 1. Enable the ViewportBenchmark addon
