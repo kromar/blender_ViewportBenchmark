@@ -19,6 +19,7 @@
 
 
 import bpy
+import bgl
 import time
 from mathutils import Euler
 from math import radians
@@ -221,6 +222,10 @@ class VPB_OT_RunBenchmark(Operator):
             hash = bpy.app.build_hash
             build_plat = bpy.app.build_platform
             build_date = bpy.app.build_date
+
+            
+
+
             #vbos = system.use_vertex_buffer_objects
             af0 = system.anisotropic_filter
             if af0 == "FILTER_0":
@@ -235,7 +240,12 @@ class VPB_OT_RunBenchmark(Operator):
             result.clear()
             result.write("BLENDER VIEWPORT BENCHMARK\n=================\n")
             result.write("Blender version: %s\nRevision: %s , %s\nPlatform: %s\n\n" % (version, hash, build_date, build_plat))
+            
+            result.write("Graphics Card:\t%r\n" % bgl.glGetString(bgl.GL_RENDERER))
+            result.write("Driver:\t%r\n" % (bgl.glGetString(bgl.GL_VERSION)))
+            import platform
 
+            result.write("CPU:\t%r\n%r\n\n" % (platform.processor(), platform.platform()))
 
             result.write("SCORES BENCHMARKS\n=================\n")
             #result.write("Object mode\n")
