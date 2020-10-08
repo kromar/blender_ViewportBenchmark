@@ -21,10 +21,12 @@
 import bpy
 import bgl
 import time
+import importlib
 from mathutils import Euler
 from math import radians
 from bpy.types import Operator 
 
+from . import cpuinfo
 
 bl_info = {
     "name": "Viewport Benchmark",
@@ -57,37 +59,26 @@ class VPB_OT_RunBenchmark(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.selected_objects
-        
+        return context.selected_objects        
 
-    def set_view(self, view_3d, degrees, distance, angle, z):
-        view_3d.view_location = (0.0 , 0.0 , z)
+    def set_view(self, view_3d, degrees, distance, angle, z_pos):
+        view_3d.view_location = (0.0 , 0.0 , z_pos)
         view_3d.view_distance = distance
         eul = Euler((radians(angle), 0.0 , 0.0), 'XYZ')
-        quat_ls = []
-        
+        quat_ls = []        
         for i in range(degrees):
             eul.z = radians(i)
             quat = eul.to_quaternion()
             quat_ls.append(list(quat))            
         return(quat_ls)
 
-
     def spin_view(self, view_3d, quat_ls1, step, angle):
         for i in range(step):
             view_3d.view_rotation = quat_ls1[i + angle]
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=0)            
 
-
-    def refresh(self, view_3d):
-        view_3d.view_location = (0.0 , 0.0 , 1.0)
-        view_3d.view_distance = 16
-        for i in range(5):
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)  
-            
-
-    def bench(self, view_3d, degrees, distance, angle, z, timeout):    
-        a = self.set_view(view_3d, degrees, distance, angle, z)
+    def bench(self, view_3d, degrees, distance, angle, z_pos):    
+        a = self.set_view(view_3d, degrees, distance, angle, z_pos)
         t0 = t1 = time.time()
         degree_start = 0
         rotSteps = 15
@@ -100,8 +91,6 @@ class VPB_OT_RunBenchmark(Operator):
             self.spin_view(view_3d, a, step, i)
             t1 = time.time()
             degree_start += step
-            if t1 - t0 > timeout:
-                break        
                         
         fps = 1 / ( (t1 - t0) / degree_start)
         return(round(fps, 2))
@@ -122,7 +111,7 @@ class VPB_OT_RunBenchmark(Operator):
             for area in screen.areas:
                 if area.type == 'VIEW_3D':
                     override = {'window': window, 'screen': screen, 'area': area}
-                    bpy.ops.screen.screen_full_area(override)   
+                    bpy.ops.screen.screen_full_area(override)                     
 
             objOp = bpy.ops.object
             meshOp = bpy.ops.mesh
@@ -144,11 +133,12 @@ class VPB_OT_RunBenchmark(Operator):
             #robot = bpy.data.objects['robot']
 
             #view_parameters
-            distance = 10.0
+            distance = 15.0
             angle = 80.0    
-            z = 1.0       
-            degrees = 360
-            timeout = 10 
+            z_pos = 4.0  
+            bench_loops = 1     
+            degrees = int(360 * bench_loops)
+
             mod_subdiv = 0
             timeov1 = time.time()
             #unlock fps
@@ -158,57 +148,58 @@ class VPB_OT_RunBenchmark(Operator):
             #set benchTarget scene
             bpy.context.window.scene = bpy.data.scenes['Scene']
             #scene.collection[0] = True
-            objOp.select_all(action='DESELECT')
+            #objOp.select_all(action='DESELECT')
             bpy.context.view_layer.objects.active = benchTarget
 
-            # benchmark: object mode 
-            #self.refresh(view_3d)
+            # benchmark: wireframe
+            #benchTarget.modifiers.new(type='SUBSURF', name="subdiv")
+            #benchTarget.modifiers['subdiv'].levels = mod_subdiv
+            # view_3d, degrees, distance, angle, z_pos): 
             view.shading.type = 'WIREFRAME'
-            benchTarget.modifiers.new(type='SUBSURF', name="subdiv")
-            benchTarget.modifiers['subdiv'].levels = mod_subdiv
-            self.refresh(view_3d)
-            # view_3d, degrees, distance, angle, z, timeout): 
-            fps10 = self.bench(view_3d, degrees, distance, angle, z, timeout)
-
-
-            view.shading.type = 'SOLID'
-            self.refresh(view_3d)
-            fps11 = self.bench(view_3d, degrees, distance, angle, z, timeout)
-
-
-            # benchmark: edit mode 
-            benchTarget.modifiers['subdiv'].levels = mod_subdiv
-            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-            view.shading.type = 'WIREFRAME'
-            objOp.mode_set(mode='OBJECT', toggle=False)
-            #objOp.modifier_apply(modifier="subdiv")
-            objOp.mode_set(mode='EDIT', toggle=False)
-            self.refresh(view_3d)
-            fps12 = self.bench(view_3d, degrees, distance, angle, z, timeout)
-            
-
-            # benchmark: solid mode
-            view.shading.type = 'MATERIAL'
-            view.shading.type = 'SOLID'
             view.shading.show_xray_wireframe = True
-            self.refresh(view_3d)
-            fps13 = self.bench(view_3d, degrees, distance, angle, z, timeout)
+            fps10 = self.bench(view_3d, degrees, distance, angle, z_pos)
+
+            # benchmark xray: 
+            view.shading.type = 'WIREFRAME'
+            #meshOp.select_all(action='SELECT')
+            view.shading.show_xray_wireframe = False
+            fps14 = self.bench(view_3d, degrees, distance, angle, z_pos)
+
+            # benchmark: solid 
+            view.shading.type = 'SOLID'
+            fps11 = self.bench(view_3d, degrees, distance, angle, z_pos)
+
+
+            # benchmark: material 
+            #benchTarget.modifiers['subdiv'].levels = mod_subdiv
+            #bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+            view.shading.type = 'MATERIAL'
+            view.shading.use_scene_lights_render = True
+            view.shading.use_scene_world_render = True
+            #objOp.mode_set(mode='OBJECT', toggle=False)
+            #objOp.modifier_apply(modifier="subdiv")
+            #objOp.mode_set(mode='EDIT', toggle=False)
+            fps12 = self.bench(view_3d, degrees, distance, angle, z_pos)
+            
+
+            # benchmark: rendered
+            view.shading.type = 'RENDERED'
+            view.shading.use_scene_lights_render = True
+            view.shading.use_scene_world_render = True
+            #view.shading.type = 'SOLID'
+            #view.shading.show_xray_wireframe = True
+            fps13 = self.bench(view_3d, degrees, distance, angle, z_pos)
 
             
-            # benchmark: 
-            view.shading.show_xray_wireframe = False
-            meshOp.select_all(action='SELECT')
-            self.refresh(view_3d)
-            fps14 = self.bench(view_3d, degrees, distance, angle, z, timeout)
 
             
         
-            benchTarget.modifiers.clear()
+            #benchTarget.modifiers.clear()
             
             #delete benchTarget scene
             view.shading.type = 'SOLID'
             #meshOp.delete(type='VERT')
-            objOp.mode_set(mode='OBJECT', toggle=False)
+            #objOp.mode_set(mode='OBJECT', toggle=False)
             benchTarget.select_set(True)
             #objOp.delete()
                 
@@ -223,9 +214,6 @@ class VPB_OT_RunBenchmark(Operator):
             build_plat = bpy.app.build_platform
             build_date = bpy.app.build_date
 
-            
-
-
             #vbos = system.use_vertex_buffer_objects
             af0 = system.anisotropic_filter
             if af0 == "FILTER_0":
@@ -236,29 +224,49 @@ class VPB_OT_RunBenchmark(Operator):
             view_aa = system.viewport_aa
             #mip = system.use_mipmaps
             #mipgpu = system.use_gpu_mipmap
+            score_max = 60
+            fps_highscore = 512   
 
             result.clear()
-            result.write("BLENDER VIEWPORT BENCHMARK\n=================\n")
+            result.write("BLENDER VIEWPORT BENCHMARK\n%s\n" % ("="*score_max))
             result.write("Blender version: %s\nRevision: %s , %s\nPlatform: %s\n\n" % (version, hash, build_date, build_plat))
             
             result.write("Graphics Card:\t%r\n" % bgl.glGetString(bgl.GL_RENDERER))
-            result.write("Driver:\t%r\n" % (bgl.glGetString(bgl.GL_VERSION)))
-            import platform
+            result.write("Driver:\t%r\n\n" % (bgl.glGetString(bgl.GL_VERSION)))
+            #cpu = cpuinfo.get_cpu_info()['brand']
+            #result.write("CPU:\t%r\n%r\n\n" % (cpu))
+            import _cycles
+            print(_cycles.get_device_types())
 
-            result.write("CPU:\t%r\n%r\n\n" % (platform.processor(), platform.platform()))
-
-            result.write("SCORES BENCHMARKS\n=================\n")
+            result.write("SCORES BENCHMARKS\n%s\n" % ("="*score_max))
             #result.write("Object mode\n")
             #result.write("Wireframe\n (4150 polys with 5 levels subsurf*, 4.2mln polys, 8.5mln tris): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps10, fps20, fps41))
             #result.write("Solid\n (5 levels subsurf*): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps11, fps21, fps42))
             #result.write("Material\n (225k polys): %.2f fps\n (1.5mln polys*): %.2f fps\n\n\n" % (fps40, fps43))
         
+                 
+
             result.write("Edit mode\n")
-            result.write("bench 1\n %.2f fps\n\n" % fps10)
-            result.write("bench 1 \n %.2f fps\n\n" % fps11)
-            result.write("Wireframe\n %.2f fps\n\n" % fps12)
-            result.write("Hiddenwire\n %.2f fps\n\n" % fps13)
-            result.write("Solid\n %.2f fps\n\n\n" % fps14)
+            result.write("bench 1\n %.2f fps\n" % fps10)
+            bench_score = int(score_max/fps_highscore*fps10)
+            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+            result.write("bench 1 \n %.2f fps\n" % fps11)
+            bench_score = int(score_max/fps_highscore*fps11)
+            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+            result.write("Wireframe\n %.2f fps\n" % fps12)
+            bench_score = int(score_max/fps_highscore*fps12)
+            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+            result.write("Hiddenwire\n %.2f fps\n" % fps13)
+            bench_score = int(score_max/fps_highscore*fps13)
+            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+            result.write("Solid\n %.2f fps\n" % fps14)
+            bench_score = int(score_max/fps_highscore*fps14)
+            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
             
             #result.write("Sculpt mode\n")
             #result.write("Solid matcap\n (25k polys with 4 levels multires, 6.5mln polys, 13mln tris): %.2f fps\n (5 levels multires, 26mln polys, 52mln tris): %.2f fps\n\n\n" % (fps30, fps31))
@@ -267,7 +275,7 @@ class VPB_OT_RunBenchmark(Operator):
 
             avg_fps = (fps10+ fps11 + fps12 + fps13 + fps14)/5
             total_fps = fps10+ fps11 + fps12 + fps13 + fps14
-            result.write("SCORE TOTAL\n=================\n")
+            result.write("SCORE TOTAL\n%s\n" % ("="*score_max))
             result.write("FPS (avg/total): %.2f / %.2f\n" % (avg_fps, total_fps))
             result.write("Time: %i min %i sec\n" % (timeovmin, timeovsec))
             
