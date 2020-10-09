@@ -26,8 +26,6 @@ from mathutils import Euler
 from math import radians
 from bpy.types import Operator 
 
-from . import cpuinfo
-
 bl_info = {
     "name": "Viewport Benchmark",
     "description": "Viewport Benchmark",
@@ -231,13 +229,18 @@ class VPB_OT_RunBenchmark(Operator):
             result.write("BLENDER VIEWPORT BENCHMARK\n%s\n" % ("="*score_max))
             result.write("Blender version: %s\nRevision: %s , %s\nPlatform: %s\n\n" % (version, hash, build_date, build_plat))
             
-            result.write("Graphics Card:\t%r\n" % bgl.glGetString(bgl.GL_RENDERER))
-            result.write("Driver:\t%r\n\n" % (bgl.glGetString(bgl.GL_VERSION)))
+
+            import platform
+            platformProcessor = platform.processor()
+            result.write("CPU:\t%r\n" % (platformProcessor))
+            result.write("GPU:\t%r\n" % bgl.glGetString(bgl.GL_RENDERER))
+            result.write("GPU Driver:\t%r\n\n" % (bgl.glGetString(bgl.GL_VERSION)))
+            
+            result.write("test %s %s" % (bpy.app.debug_gpumem, bpy.app.build_system))
             #cpu = cpuinfo.get_cpu_info()['brand']
             #result.write("CPU:\t%r\n%r\n\n" % (cpu))
-            import _cycles
-            print(_cycles.get_device_types())
-
+            #import _cycles
+            #print(_cycles.get_device_types())
             result.write("SCORES BENCHMARKS\n%s\n" % ("="*score_max))
             #result.write("Object mode\n")
             #result.write("Wireframe\n (4150 polys with 5 levels subsurf*, 4.2mln polys, 8.5mln tris): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps10, fps20, fps41))
