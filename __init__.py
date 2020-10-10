@@ -21,6 +21,7 @@
 import bpy
 import bgl
 import time
+import math
 import importlib
 from mathutils import Euler
 from math import radians
@@ -46,7 +47,8 @@ def draw_button(self, context):
     if context.region.alignment == 'RIGHT':
         layout = self.layout
         row = layout.row(align=True)            
-        row.operator(operator="viewport_benchmark.run", text="Run Benchmark", icon='SYSTEM', emboss=True, depress=False)
+        row.operator(operator="viewport_benchmark.run", text="", icon='CUBE', emboss=True, depress=False)
+        row.operator(operator="wm.modal_timer_operator", text="", icon='SYSTEM', emboss=True, depress=False)
         
 
 class VPB_OT_RunBenchmark(Operator): 
@@ -72,6 +74,7 @@ class VPB_OT_RunBenchmark(Operator):
 
     def spin_view(self, view_3d, quat_ls1, step, angle):
         for i in range(step):
+            print((i + angle), step, quat_ls1[i + angle])
             view_3d.view_rotation = quat_ls1[i + angle]
             bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=0)            
 
@@ -290,8 +293,129 @@ class VPB_OT_RunBenchmark(Operator):
             return {'FINISHED'}
 
 
+     
+           
+
+
+
+
+class ModalTimerOperator(bpy.types.Operator):
+    """Operator which runs its self from a timer"""
+    bl_idname = "wm.modal_timer_operator"
+    bl_label = "Modal Timer Operator"
+    
+    _view_3d = None
+    _timer = None
+    _score_max = 60
+    _fps_highscore = 1000 
+
+    _distance = 15.0
+    _angle = 80.0    
+    _z_pos = 4.0  
+    _bench_loops = 1     
+    _degrees = int(360 * _bench_loops)
+
+    """ @classmethod
+    def poll(cls, context):
+        return context.selected_objects   """
+
+    def set_view(self, view_3d, degrees, distance, angle, z_pos):
+        
+        #TODO: move positioning to invoke/excute
+        #view_3d.view_location = (0.0 , 0.0 , z_pos)
+        #view_3d.view_distance = distance        
+        eul = Euler((radians(angle), 0.0 , 0.0), 'XYZ')
+
+        quat_ls = []        
+        for i in range(degrees):
+            eul.z = radians(i)
+            quat = eul.to_quaternion()
+            quat_ls.append(list(quat))            
+        return(quat_ls)
+
+
+
+    def bench(self, view_3d, degrees, distance, angle, z_pos):    
+        quat_ls = self.set_view(view_3d, degrees, distance, angle, z_pos)
+        t0 = t1 = time.time()
+        degree_start = 0
+        rotSteps = 15
+        if degrees < rotSteps:
+            step = degrees
+        else:
+            step = rotSteps
+            
+        for i in range(0, degrees, step):
+            self.spin_view(view_3d, quat_ls, step, i)
+            t1 = time.time()
+            degree_start += step
+
+        #print("FPS: ", (t1 - t0), degree_start, degrees)
+        fps = 1 / ( 0.1 / degree_start)
+        return(round(fps, 4))
+
+
+    def spin_view(self, view_3d, quat_ls, step, angle):
+        for i in range(step):
+            print((i + angle), step, quat_ls[i + angle])
+            view_3d.view_rotation = quat_ls[i + angle]
+   
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+
+
+    def execute(self, context):
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(1/self._fps_highscore, window=context.window)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    
+    def rotate(self):
+        i = 0
+        for i in range(0,360,1):
+            return(i)
+            #print(i)
+
+
+
+    def modal(self, context, event):
+        if event.type in {'ESC'}:
+            self.cancel(context)
+            return {'CANCELLED'}
+
+        if event.type == 'TIMER':
+            # change theme color, silly!
+            color = context.preferences.themes[0].view_3d.space.gradients.high_gradient
+            color.s = 1.0
+            color.h += 0.001
+            
+            fps10 = self.bench(self._view_3d, self._degrees, self._distance, self._angle, self._z_pos)
+            
+        return {'PASS_THROUGH'}
+
+
+    def invoke(self, context, event):        
+        for window in bpy.context.window_manager.windows:
+            screen = window.screen
+            for area in screen.areas:
+                if area.type == 'VIEW_3D':
+                    override = {'window': window, 'screen': screen, 'area': area}
+                    bpy.ops.screen.screen_full_area(override)                     
+
+        self._view_3d = bpy.context.screen.areas[0].spaces[0].region_3d            
+        bpy.data.scenes['Scene'].render.fps = self._fps_highscore
+
+        self.execute(context)
+        return {'RUNNING_MODAL'}
+
+
+
+
 classes = (
     VPB_OT_RunBenchmark, 
+    ModalTimerOperator,
     ) 
 
 
