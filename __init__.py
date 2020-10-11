@@ -24,7 +24,7 @@ import time
 import math
 import importlib
 from mathutils import Euler
-from math import radians
+import math
 from bpy.types import Operator 
 
 bl_info = {
@@ -47,7 +47,7 @@ def draw_button(self, context):
     if context.region.alignment == 'RIGHT':
         layout = self.layout
         row = layout.row(align=True)            
-        row.operator(operator="viewport_benchmark.run", text="", icon='CUBE', emboss=True, depress=False)
+        row.operator(operator="viewport_benchmark.run", text="", icon='MEMORY', emboss=True, depress=False)
         row.operator(operator="wm.modal_timer_operator", text="", icon='SYSTEM', emboss=True, depress=False)
         
 
@@ -61,34 +61,37 @@ class VPB_OT_RunBenchmark(Operator):
     def poll(cls, context):
         return context.selected_objects        
 
-    def set_view(self, view_3d, degrees, distance, angle, z_pos):
+    def set_view(self, view_3d, deg, distance, angle, z_pos):
         view_3d.view_location = (0.0 , 0.0 , z_pos)
         view_3d.view_distance = distance
-        eul = Euler((radians(angle), 0.0 , 0.0), 'XYZ')
+        eul = Euler((math.radians(angle), 0.0 , 0.0), 'XYZ')
         quat_ls = []        
-        for i in range(degrees):
-            eul.z = radians(i)
+        for i in range(deg):
+            print("\n",eul, eul.z)
+            eul.z = math.radians(i)
             quat = eul.to_quaternion()
+            print(eul, eul.z, quat)
             quat_ls.append(list(quat))            
         return(quat_ls)
 
     def spin_view(self, view_3d, quat_ls1, step, angle):
         for i in range(step):
-            print((i + angle), step, quat_ls1[i + angle])
+            #print((i + angle), step, quat_ls1[i + angle])
             view_3d.view_rotation = quat_ls1[i + angle]
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=0)            
+            if bpy.ops.wm.redraw_timer.poll():                
+                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)      
 
-    def bench(self, view_3d, degrees, distance, angle, z_pos):    
-        a = self.set_view(view_3d, degrees, distance, angle, z_pos)
+    def bench(self, view_3d, deg, distance, angle, z_pos):    
+        a = self.set_view(view_3d, deg, distance, angle, z_pos)
         t0 = t1 = time.time()
         degree_start = 0
         rotSteps = 15
-        if degrees < rotSteps:
-            step = degrees
+        if deg < rotSteps:
+            step = deg
         else:
             step = rotSteps
             
-        for i in range(0, degrees, step):
+        for i in range(0, deg, step):
             self.spin_view(view_3d, a, step, i)
             t1 = time.time()
             degree_start += step
@@ -138,7 +141,7 @@ class VPB_OT_RunBenchmark(Operator):
             angle = 80.0    
             z_pos = 4.0  
             bench_loops = 1     
-            degrees = int(360 * bench_loops)
+            deg = int(360 * bench_loops)
 
             mod_subdiv = 0
             timeov1 = time.time()
@@ -155,20 +158,20 @@ class VPB_OT_RunBenchmark(Operator):
             # benchmark: wireframe
             #benchTarget.modifiers.new(type='SUBSURF', name="subdiv")
             #benchTarget.modifiers['subdiv'].levels = mod_subdiv
-            # view_3d, degrees, distance, angle, z_pos): 
+            # view_3d, deg, distance, angle, z_pos): 
             view.shading.type = 'WIREFRAME'
             view.shading.show_xray_wireframe = True
-            fps10 = self.bench(view_3d, degrees, distance, angle, z_pos)
+            fps10 = self.bench(view_3d, deg, distance, angle, z_pos)
 
             # benchmark xray: 
             view.shading.type = 'WIREFRAME'
             #meshOp.select_all(action='SELECT')
             view.shading.show_xray_wireframe = False
-            fps14 = self.bench(view_3d, degrees, distance, angle, z_pos)
+            fps14 = self.bench(view_3d, deg, distance, angle, z_pos)
 
             # benchmark: solid 
             view.shading.type = 'SOLID'
-            fps11 = self.bench(view_3d, degrees, distance, angle, z_pos)
+            fps11 = self.bench(view_3d, deg, distance, angle, z_pos)
 
 
             # benchmark: material 
@@ -180,7 +183,7 @@ class VPB_OT_RunBenchmark(Operator):
             #objOp.mode_set(mode='OBJECT', toggle=False)
             #objOp.modifier_apply(modifier="subdiv")
             #objOp.mode_set(mode='EDIT', toggle=False)
-            fps12 = self.bench(view_3d, degrees, distance, angle, z_pos)
+            fps12 = self.bench(view_3d, deg, distance, angle, z_pos)
             
 
             # benchmark: rendered
@@ -189,7 +192,7 @@ class VPB_OT_RunBenchmark(Operator):
             view.shading.use_scene_world_render = True
             #view.shading.type = 'SOLID'
             #view.shading.show_xray_wireframe = True
-            fps13 = self.bench(view_3d, degrees, distance, angle, z_pos)
+            fps13 = self.bench(view_3d, deg, distance, angle, z_pos)
 
             
 
@@ -307,50 +310,50 @@ class ModalTimerOperator(bpy.types.Operator):
     _view_3d = None
     _timer = None
     _score_max = 60
-    _fps_highscore = 1000 
+    _fps_highscore = 999 
 
     _distance = 15.0
     _angle = 80.0    
     _z_pos = 4.0  
     _bench_loops = 1     
-    _degrees = int(360 * _bench_loops)
+    _deg = 360 * _bench_loops
 
     """ @classmethod
     def poll(cls, context):
         return context.selected_objects   """
 
-    def set_view(self, view_3d, degrees, distance, angle, z_pos):
-        
+    def set_view(self, view_3d, deg, distance, angle, z_pos):        
         #TODO: move positioning to invoke/excute
         #view_3d.view_location = (0.0 , 0.0 , z_pos)
         #view_3d.view_distance = distance        
-        eul = Euler((radians(angle), 0.0 , 0.0), 'XYZ')
-
+        eul = Euler((math.radians(angle), 0.0 , 0.0), 'XYZ')
+        print("\n",eul)
         quat_ls = []        
-        for i in range(degrees):
-            eul.z = radians(i)
+        for i in range(deg):
+            eul.z = math.radians(i)
+            print(eul.z)
             quat = eul.to_quaternion()
             quat_ls.append(list(quat))            
         return(quat_ls)
 
 
 
-    def bench(self, view_3d, degrees, distance, angle, z_pos):    
-        quat_ls = self.set_view(view_3d, degrees, distance, angle, z_pos)
+    def bench(self, view_3d, deg, distance, angle, z_pos):    
+        quat_ls = self.set_view(view_3d, deg, distance, angle, z_pos)
         t0 = t1 = time.time()
         degree_start = 0
         rotSteps = 15
-        if degrees < rotSteps:
-            step = degrees
+        if deg < rotSteps:
+            step = deg
         else:
             step = rotSteps
             
-        for i in range(0, degrees, step):
+        for i in range(0, deg, step):
             self.spin_view(view_3d, quat_ls, step, i)
             t1 = time.time()
             degree_start += step
 
-        #print("FPS: ", (t1 - t0), degree_start, degrees)
+        #print("FPS: ", (t1 - t0), degree_start, deg)
         fps = 1 / ( 0.1 / degree_start)
         return(round(fps, 4))
 
@@ -367,18 +370,19 @@ class ModalTimerOperator(bpy.types.Operator):
 
     def execute(self, context):
         wm = context.window_manager
+
         self._timer = wm.event_timer_add(1/self._fps_highscore, window=context.window)
+        #self._timer = wm.event_timer_add(0.01, window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
     
     def rotate(self):
-        i = 0
-        for i in range(0,360,1):
-            return(i)
-            #print(i)
-
-
+        eul = self._view_3d.view_rotation.to_euler()
+        eul.z = eul.z + math.radians(1)
+        quat = eul.to_quaternion()
+        self._view_3d.view_rotation = quat
+        
 
     def modal(self, context, event):
         if event.type in {'ESC'}:
@@ -391,7 +395,11 @@ class ModalTimerOperator(bpy.types.Operator):
             color.s = 1.0
             color.h += 0.001
             
-            fps10 = self.bench(self._view_3d, self._degrees, self._distance, self._angle, self._z_pos)
+            angle = self.rotate()
+            
+            #self._view_3d.view_rotation = angle
+            #self._view_3d.view_rotation = angle
+            #fps10 = self.bench(self._view_3d, self._deg, self._distance, self._angle, self._z_pos)
             
         return {'PASS_THROUGH'}
 
