@@ -21,10 +21,11 @@
 import bpy
 import bgl
 import time
+from time import perf_counter 
 import math
+import mathutils
 import importlib
-from mathutils import Euler
-import math
+from mathutils import Euler, Matrix
 from bpy.types import Operator 
 
 bl_info = {
@@ -46,10 +47,173 @@ def draw_button(self, context):
     #if pref.button_toggle:
     if context.region.alignment == 'RIGHT':
         layout = self.layout
-        row = layout.row(align=True)            
-        #row.operator(operator="viewport_benchmark.run", text="", icon='MEMORY', emboss=True, depress=False)
-        row.operator(operator="wm.modal_timer_operator", text="Benchmark", icon='SYSTEM', emboss=True, depress=False)
+        row = layout.row(align=True)  
+               
+        #row.operator(operator="viewport_benchmark.run", text="", icon='MONKEY', emboss=True, depress=False)
+        row.operator(operator="wm.modal_timer_operator", text="Benchmark", icon='MONKEY', emboss=True, depress=False)
+        #row.operator(operator="wm.benchmark", text="", icon='MEMORY', emboss=True, depress=False)
         
+        
+        
+
+
+class BenchmarkOperator(bpy.types.Operator):
+    """Operator which runs its self from a timer"""
+    bl_idname = "wm.modal_timer_operator"
+    bl_label = "Modal Timer Operator"
+    
+    _view_3d = None
+    _timer = None
+    
+    _view_refresh_rate = 1/30
+    _view_distance = 15.0
+    _view_angle = 80.0    
+    _view_z_pos = 2.0  
+
+    _bench_score_max = 60
+    _bench__fps_max = 999 
+    _bench_loops = int(360 * 4)
+    _bench_angle_steps = 1
+    _count = 0 
+    _prevcol = 0
+    _steps = 1
+    _time_start = 0
+
+    """ @classmethod
+    def poll(cls, context):
+        return context.selected_objects   """
+        
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+        bpy.ops.screen.back_to_previous()
+
+    def execute(self, context):
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(1/self._bench__fps_max, window=context.window)
+        wm.modal_handler_add(self)
+        #start timer        
+        self._time_start = time.time()
+        return {'RUNNING_MODAL'}
+            
+    def modal(self, context, event):
+        if event.type in {'ESC'}:
+            self.cancel(context)
+            context.window_manager.event_timer_remove(self._timer)
+            return {'CANCELLED'}
+
+        if event.type == 'TIMER': 
+            eul = self._view_3d.view_rotation.to_euler()            
+            eul.z = eul.z + math.radians(self._bench_angle_steps)      
+            self._view_3d.view_rotation = eul.to_quaternion()     
+            
+            #finish benchmark
+            self._count += self._steps
+            if self._count == self._bench_loops:
+                time_stop = time.time() 
+                if (time_stop-self._time_start) > 0:
+                    print(self._count, "\n", self._time_start, "\n", time_stop, "\n", (time_stop-self._time_start))
+                    fps = round((1 / ( (time_stop-self._time_start)/self._bench_loops)), 4)
+                    print("FPS: ", fps)
+
+               
+                context.window_manager.event_timer_remove(self._timer)
+                
+                """ bpy.context.space_data.show_gizmo = True
+                bpy.context.space_data.overlay.show_overlays = True  """   
+                """ if bpy.ops.screen.back_to_previous.poll():
+                    bpy.ops.screen.back_to_previous() """
+                return {'FINISHED'}
+                
+        return {'PASS_THROUGH'}
+
+
+    def invoke(self, context, event): 
+        for window in context.window_manager.windows:
+            screen = window.screen
+            for area in screen.areas:
+                if area.type == 'VIEW_3D':             
+                    self._view_3d = area.spaces.active.region_3d
+                    override = {'window': window, 'screen': screen, 'area': area}                    
+                    bpy.ops.screen.screen_full_area(override)       
+                    """ bpy.context.space_data.show_gizmo = False
+                    bpy.context.space_data.overlay.show_overlays = False   """
+        
+        bpy.data.scenes['Scene'].render.fps = self._bench__fps_max
+        
+        #initialize view
+        self._view_3d.view_location = (0.0 , 0.0 , self._view_z_pos)
+        self._view_3d.view_distance = self._view_distance 
+        eul = Euler((math.radians(self._view_angle), 0.0 , 0.0), 'XYZ')
+        quat = eul.to_quaternion()         
+        self._view_3d.view_rotation = quat
+
+        self.execute(context)
+        return {'RUNNING_MODAL'}
+
+
+
+class AppTimersOperator(bpy.types.Operator):
+    """Run Benchmark"""
+    bl_idname = "wm.benchmark"
+    bl_label = "Run Benchmark"
+
+    _counter = 0
+    _timer = None
+    _view_3d = None
+    
+    _view_refresh_rate = 1/30
+    _view_distance = 15.0
+    _view_angle = 80.0    
+    _view_z_pos = 2.0  
+
+    _bench_score_max = 60
+    _bench__fps_max = 999 
+    _bench_loops = int(360 * 10)
+    _bench_angle_steps = 1
+
+    def runbenchmark(self):
+        eul = self._view_3d.view_rotation.to_euler()
+        eul.z = eul.z + math.radians(self._bench_angle_steps)
+        quat = eul.to_quaternion()         
+        self._view_3d.view_rotation = quat
+        
+        self._counter += self._bench_angle_steps
+        #print(self._counter)
+
+        if self._counter == self._bench_loops:            
+            bpy.ops.screen.back_to_previous()
+            return None            
+        return 1/self._bench__fps_max
+
+        
+    def execute(self,context):  
+        bpy.app.timers.register(self.runbenchmark)          
+        return {'RUNNING_MODAL'}
+
+
+    def invoke(self, context, event):        
+        for window in bpy.context.window_manager.windows:
+            screen = window.screen
+            for area in screen.areas:
+                if area.type == 'VIEW_3D':
+                    override = {'window': window, 'screen': screen, 'area': area}
+                    bpy.ops.screen.screen_full_area(override)                     
+
+        self._view_3d = bpy.context.screen.areas[0].spaces[0].region_3d            
+        bpy.data.scenes['Scene'].render.fps = self._bench__fps_max
+
+        #initialize view
+        self._view_3d.view_location = (0.0 , 0.0 , self._view_z_pos)
+        self._view_3d.view_distance = self._view_distance 
+        eul = Euler((math.radians(self._view_angle), 0.0 , 0.0), 'XYZ')
+        quat = eul.to_quaternion()         
+        self._view_3d.view_rotation = quat
+
+        self.execute(context)
+        return {'RUNNING_MODAL'}
+        
+
 
 class VPB_OT_RunBenchmark(Operator): 
     """Run Viewport Benchmark""" 
@@ -83,7 +247,7 @@ class VPB_OT_RunBenchmark(Operator):
 
     def bench(self, view_3d, deg, distance, angle, z_pos):    
         a = self.set_view(view_3d, deg, distance, angle, z_pos)
-        t0 = t1 = time.time()
+        time_start = time_stop = time.time()
         degree_start = 0
         rotSteps = 15
         if deg < rotSteps:
@@ -93,10 +257,10 @@ class VPB_OT_RunBenchmark(Operator):
             
         for i in range(0, deg, step):
             self.spin_view(view_3d, a, step, i)
-            t1 = time.time()
+            time_stop = time.time()
             degree_start += step
                         
-        fps = 1 / ( (t1 - t0) / degree_start)
+        fps = 1 / ( (time_stop - time_start) / degree_start)
         return(round(fps, 2))
 
         
@@ -296,145 +460,12 @@ class VPB_OT_RunBenchmark(Operator):
             return {'FINISHED'}
 
 
-     
-           
-
-
-
-
-class ModalTimerOperator(bpy.types.Operator):
-    """Operator which runs its self from a timer"""
-    bl_idname = "wm.modal_timer_operator"
-    bl_label = "Modal Timer Operator"
-    
-    _view_3d = None
-    _timer = None
-    
-    _view_refresh_rate = 1/30
-    _view_distance = 15.0
-    _view_angle = 80.0    
-    _view_z_pos = 2.0  
-
-    _bench_score_max = 60
-    _bench__fps_max = 999 
-    _bench_loops = 360 * 1     
-    _bench_angle_steps = 1
-
-
-    """ @classmethod
-    def poll(cls, context):
-        return context.selected_objects   """
-
-    def set_view(self, view_3d, deg, distance, angle, z_pos):        
-        #TODO: move positioning to invoke/excute
-        #view_3d.view_location = (0.0 , 0.0 , z_pos)
-        #view_3d.view_view_distance = distance        
-        eul = Euler((math.radians(angle), 0.0 , 0.0), 'XYZ')
-        print("\n",eul)
-        quat_ls = []        
-        for i in range(deg):
-            eul.z = math.radians(i)
-            print(eul.z)
-            quat = eul.to_quaternion()
-            quat_ls.append(list(quat))            
-        return(quat_ls)
-
-
-
-    def bench(self, view_3d, deg, distance, angle, z_pos):    
-        quat_ls = self.set_view(view_3d, deg, distance, angle, z_pos)
-        t0 = t1 = time.time()
-        degree_start = 0
-        rotSteps = 15
-        if deg < rotSteps:
-            step = deg
-        else:
-            step = rotSteps
-            
-        for i in range(0, deg, step):
-            self.spin_view(view_3d, quat_ls, step, i)
-            t1 = time.time()
-            degree_start += step
-
-        #print("FPS: ", (t1 - t0), degree_start, deg)
-        fps = 1 / ( 0.1 / degree_start)
-        return(round(fps, 4))
-
-
-    def spin_view(self, view_3d, quat_ls, step, angle):
-        for i in range(step):
-            print((i + angle), step, quat_ls[i + angle])
-            view_3d.view_rotation = quat_ls[i + angle]
-   
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        bpy.ops.screen.back_to_previous()
-
-
-    def execute(self, context):
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(self._view_refresh_rate, window=context.window)
-        wm.modal_handler_add(self)
-        return {'RUNNING_MODAL'}
-
-    
-    def rotate(self):
-        eul = self._view_3d.view_rotation.to_euler()
-        eul.z = eul.z + math.radians(self._bench_angle_steps)
-        quat = eul.to_quaternion()
-        return quat
-        
-        
-
-    def modal(self, context, event):
-        if event.type in {'ESC'}:
-            self.cancel(context)
-            return {'CANCELLED'}
-
-        if event.type == 'TIMER':
-            # change theme color, silly!
-            color = context.preferences.themes[0].view_3d.space.gradients.high_gradient
-            color.s = 1.0
-            color.h += 0.001
-
-
-            #quat = self.rotate()   
-            eul = self._view_3d.view_rotation.to_euler()
-            eul.z = eul.z + math.radians(self._bench_angle_steps)
-            quat = eul.to_quaternion()         
-            self._view_3d.view_rotation = quat
-            
-        return {'PASS_THROUGH'}
-
-
-    def invoke(self, context, event):        
-        for window in bpy.context.window_manager.windows:
-            screen = window.screen
-            for area in screen.areas:
-                if area.type == 'VIEW_3D':
-                    override = {'window': window, 'screen': screen, 'area': area}
-                    bpy.ops.screen.screen_full_area(override)                     
-
-        self._view_3d = bpy.context.screen.areas[0].spaces[0].region_3d            
-        bpy.data.scenes['Scene'].render.fps = self._bench__fps_max
-
-        #initialize view
-        self._view_3d.view_location = (0.0 , 0.0 , self._view_z_pos)
-        self._view_3d.view_distance = self._view_distance 
-        eul = Euler((math.radians(self._view_angle), 0.0 , 0.0), 'XYZ')
-        quat = eul.to_quaternion()         
-        self._view_3d.view_rotation = quat
-
-        self.execute(context)
-        return {'RUNNING_MODAL'}
-
-
 
 
 classes = (
     VPB_OT_RunBenchmark, 
-    ModalTimerOperator,
+    BenchmarkOperator,
+    AppTimersOperator,
     ) 
 
 
