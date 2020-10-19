@@ -70,7 +70,7 @@ class BenchmarkOperator(bpy.types.Operator):
     _view_3d = None
     _modal_timer = None
     _angle = 0 
-    #_angle_target = int(360 * pref.loops)    
+    _bench_index = 0  
 
     _time_start = 0
     _report_bar_width = 60
@@ -81,8 +81,7 @@ class BenchmarkOperator(bpy.types.Operator):
     def poll(cls, context):
         return context.selected_objects   """
     
-    def initializeView(self, context, value):          
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences 
+    def initializeView(self, context, pref):       
         view = bpy.context.screen.areas[0].spaces.active     
         self._view_3d.view_location = (0.0 , 0.0 , pref.view_z_pos)
         self._view_3d.view_distance = pref.view_distance 
@@ -91,8 +90,8 @@ class BenchmarkOperator(bpy.types.Operator):
         self._view_3d.view_rotation = quat
 
         #rendering configs
-        view.shading.type = value
-
+        print("benchamrk mode: ", self.benchmarkList[self._bench_index])
+        view.shading.type = self.benchmarkList[self._bench_index]
         #start timer        
         self._time_start = time.time()
         return
@@ -122,15 +121,15 @@ class BenchmarkOperator(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-    def runBenchmark(self, context):           
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+    def runBenchmark(self, context, pref):           
+        #run rotation
         eul = self._view_3d.view_rotation.to_euler()            
         eul.z = eul.z + math.radians(pref.angle_steps)
         self._view_3d.view_rotation = eul.to_quaternion()
 
         #calculate fps
         if pref.is_benchmark:
-            print("angle: ", self._angle)
+            #print("angle: ", self._angle)
             self._angle += pref.angle_steps
 
             if self._angle == int(360 * pref.loops):
@@ -141,12 +140,22 @@ class BenchmarkOperator(bpy.types.Operator):
                 
                 #context.window_manager.event_timer_remove(self._modal_timer) 
                 self._time_start = 0
-                self._angle = 0
+                self._angle = 0                
+                self._bench_index += 1
                 
-                return {'FINISHED'}
-
+                print(self._bench_index, len(self.benchmarkList))
+                if self._bench_index == len(self.benchmarkList): 
+                    bench_finish = True
+                else:
+                    bench_finish = False                 
+                    
+                return bench_finish
+        else:            
+            pass
 
     def modal(self, context, event):
+        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+        
         if event.type in {'ESC'}:
             self.cancel(context)
             context.window_manager.event_timer_remove(self._modal_timer)
@@ -156,12 +165,17 @@ class BenchmarkOperator(bpy.types.Operator):
         if event.type == 'TIMER': 
             #preapre setting for benchmark
             if self._time_start == 0:
-                self.initializeView(context,'WIREFRAME')
-            
-            #initialize benchmark
-            self.runBenchmark(context)
+                self.initializeView(context, pref)
 
-        return {'RUNNING_MODAL'}
+            #initialize benchmark
+            bench_finish = self.runBenchmark(context, pref)
+            if bench_finish:
+                return {'FINISHED'}
+
+        if pref.is_interactive:
+            return {'PASS_THROUGH'}
+        else:
+            return {'RUNNING_MODAL'}
 
 
 

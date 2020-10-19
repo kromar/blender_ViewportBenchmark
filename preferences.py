@@ -31,10 +31,10 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     bl_idname = __package__
 
     is_benchmark: BoolProperty(
-        name="Stress Test",
+        name="is_benchmark",
         description="Chose wether to run a benchmark or a stress test",
-        default=False)
-    
+        default=True)
+
     view_angle: FloatProperty(
         name="view_angle",
         description="view_angle",
@@ -68,17 +68,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     max_render_fps: FloatProperty(
         name="max_render_fps",
         description="max_render_fps",
-        default=24,
-        min = 0,
-        soft_max=1000,
-        step=1,
-        precision=0,
-        subtype='FACTOR') 
-
-    max_render_fps: FloatProperty(
-        name="max_render_fps",
-        description="max_render_fps",
-        default=24,
+        default=1000,
         min = 0,
         soft_max=1000,
         step=1,
@@ -105,20 +95,44 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         precision=0,
         subtype='FACTOR') 
 
-        
+    
+    # debug mode
+    debug_mode: BoolProperty(
+        name="debug_mode",
+        description="debug_mode",
+        default=True)
+    
+    is_interactive: BoolProperty(
+        name="is_interactive",
+        description="is_interactive",
+        default=True)    
   
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout        
         layout.use_property_split = True
-        layout.prop(self, 'is_benchmark') 
 
-        layout.prop(self, 'view_angle') 
-        layout.prop(self, 'view_distance') 
-        layout.prop(self, 'view_z_pos') 
+        
+        col = layout.column(align=True)
+        col.prop(self, 'max_render_fps') 
+        col.prop(self, 'loops') 
+        col.prop(self, 'angle_steps') 
 
-        layout.prop(self, 'max_render_fps') 
-        layout.prop(self, 'loops') 
-        layout.prop(self, 'angle_steps') 
+        col = layout.column(align=True)
+        col.prop(self, 'view_angle') 
+        col.prop(self, 'view_distance') 
+        col.prop(self, 'view_z_pos') 
+
+
+        # debug mode
+        layout = self.layout  
+        col = layout.column(align=True)
+        col.prop(self, 'debug_mode') 
+        if self.debug_mode:  
+            layout = self.layout  
+            col = layout.column(align=True)
+            col.prop(self, 'is_interactive') 
+            col.prop(self, 'is_benchmark') 
+
 
         
 
