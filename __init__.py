@@ -47,6 +47,9 @@ bl_info = {
 }
 
 
+benchResults = {}
+
+
 def draw_button(self, context):
     #pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences    
     
@@ -55,9 +58,9 @@ def draw_button(self, context):
         layout = self.layout
         row = layout.row(align=True)  
                
-        #row.operator(operator="viewport_benchmark.run", text="", icon='MONKEY', emboss=True, depress=False)
-        row.operator(operator="wm.modal_timer_operator", text="Benchmark", icon='MONKEY', emboss=True, depress=False)
-        ##row.operator(operator="wm.benchmark", text="", icon='MEMORY', emboss=True, depress=False)
+        row.operator(operator="wm.modal_timer_operator", text="modal", icon='MONKEY', emboss=True, depress=False)
+        row.operator(operator="viewport_benchmark.run", text="old", icon='MONKEY', emboss=True, depress=False)
+        row.operator(operator="wm.benchmark", text="timer", icon='MEMORY', emboss=True, depress=False)
         
 
 
@@ -213,6 +216,7 @@ class AppTimersOperator(bpy.types.Operator):
     #_angle_target = int(360 * 10)
 
     def runbenchmark(self):
+        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
         eul = self._view_3d.view_rotation.to_euler()
         eul.z = eul.z + math.radians(pref.angle_steps)
         quat = eul.to_quaternion()         
@@ -229,10 +233,16 @@ class AppTimersOperator(bpy.types.Operator):
         
     def execute(self,context):  
         bpy.app.timers.register(self.runbenchmark)          
-        return {'RUNNING_MODAL'}
+        
+        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+        if pref.is_interactive:
+            return {'PASS_THROUGH'}
+        else:
+            return {'RUNNING_MODAL'}
 
 
-    def invoke(self, context, event):        
+    def invoke(self, context, event):     
+        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences  
         for window in bpy.context.window_manager.windows:
             screen = window.screen
             for area in screen.areas:
@@ -246,7 +256,7 @@ class AppTimersOperator(bpy.types.Operator):
         #initialize view
         self._view_3d.view_location = (0.0 , 0.0 , pref.view_z_pos)
         self._view_3d.view_distance = pref.view_distance 
-        eul = Euler((math.radians(self.view_angle), 0.0 , 0.0), 'XYZ')
+        eul = Euler((math.radians(pref.view_angle), 0.0 , 0.0), 'XYZ')
         quat = eul.to_quaternion()         
         self._view_3d.view_rotation = quat
 
@@ -304,15 +314,8 @@ class VPB_OT_RunBenchmark(Operator):
         return(round(fps, 2))
 
         
-    def execute(self, context):        
-        #create result file
-        try:
-            bpy.data.texts['Benchmark_Result']
-        except:
-            bpy.ops.text.new()
-            bpy.data.texts['Text'].name = 'Benchmark_Result'
-        result = bpy.data.texts['Benchmark_Result']
-
+    def execute(self, context):       
+        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
         #set 3d view as context to run benchmark
         for window in bpy.context.window_manager.windows:
             screen = window.screen
@@ -347,7 +350,7 @@ class VPB_OT_RunBenchmark(Operator):
             deg = int(360 * pref.loops)
 
             mod_subdiv = 0
-            timeov1 = time.time()
+            benchtime = time.time()
             #unlock fps
             user_fps = bpy.context.scene.render.fps
             bpy.data.scenes['Scene'].render.fps = 9999
@@ -397,10 +400,7 @@ class VPB_OT_RunBenchmark(Operator):
             #view.shading.show_xray_wireframe = True
             fps13 = self.bench(view_3d, deg, distance, angle, z_pos)
 
-            
-
-            
-        
+                   
             #benchTarget.modifiers.clear()
             
             #delete benchTarget scene
@@ -409,100 +409,115 @@ class VPB_OT_RunBenchmark(Operator):
             #objOp.mode_set(mode='OBJECT', toggle=False)
             benchTarget.select_set(True)
             #objOp.delete()
-                
-                
-            timeov = round(time.time() - timeov1)
-            timeovmin = int(timeov / 60)
-            timeovsec = timeov - (timeovmin * 60)
 
-            system = bpy.context.preferences.system
-            version = str(bpy.app.version)
-            hash = bpy.app.build_hash
-            build_plat = bpy.app.build_platform
-            build_date = bpy.app.build_date
 
-            #vbos = system.use_vertex_buffer_objects
-            af0 = system.anisotropic_filter
-            if af0 == "FILTER_0":
-                af = "Off"
-            else:
-                af = af0[7:] + "x"
-            draw_met = system.image_draw_method
-            view_aa = system.viewport_aa
-            #mip = system.use_mipmaps
-            #mipgpu = system.use_gpu_mipmap
-            score_max = 60
-            fps_highscore = 512   
-
-            result.clear()
-            result.write("BLENDER VIEWPORT BENCHMARK\n%s\n" % ("="*score_max))
-            result.write("Blender version: %s\nRevision: %s , %s\nPlatform: %s\n\n" % (version, hash, build_date, build_plat))
-            
-
-            import platform
-            platformProcessor = platform.processor()
-            result.write("CPU:\t%r\n" % (platformProcessor))
-            result.write("GPU:\t%r\n" % bgl.glGetString(bgl.GL_RENDERER))
-            result.write("GPU Driver:\t%r\n\n" % (bgl.glGetString(bgl.GL_VERSION)))
-            
-            result.write("test %s %s" % (bpy.app.debug_gpumem, bpy.app.build_system))
-            #cpu = cpuinfo.get_cpu_info()['brand']
-            #result.write("CPU:\t%r\n%r\n\n" % (cpu))
-            #import _cycles
-            #print(_cycles.get_device_types())
-            result.write("SCORES BENCHMARKS\n%s\n" % ("="*score_max))
-            #result.write("Object mode\n")
-            #result.write("Wireframe\n (4150 polys with 5 levels subsurf*, 4.2mln polys, 8.5mln tris): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps10, fps20, fps41))
-            #result.write("Solid\n (5 levels subsurf*): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps11, fps21, fps42))
-            #result.write("Material\n (225k polys): %.2f fps\n (1.5mln polys*): %.2f fps\n\n\n" % (fps40, fps43))
-        
-                 
-
-            result.write("Edit mode\n")
-            result.write("bench 1\n %.2f fps\n" % fps10)
-            bench_score = int(score_max/fps_highscore*fps10)
-            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
-
-            result.write("bench 1 \n %.2f fps\n" % fps11)
-            bench_score = int(score_max/fps_highscore*fps11)
-            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
-
-            result.write("Wireframe\n %.2f fps\n" % fps12)
-            bench_score = int(score_max/fps_highscore*fps12)
-            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
-
-            result.write("Hiddenwire\n %.2f fps\n" % fps13)
-            bench_score = int(score_max/fps_highscore*fps13)
-            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
-
-            result.write("Solid\n %.2f fps\n" % fps14)
-            bench_score = int(score_max/fps_highscore*fps14)
-            result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
-
-            
-            #result.write("Sculpt mode\n")
-            #result.write("Solid matcap\n (25k polys with 4 levels multires, 6.5mln polys, 13mln tris): %.2f fps\n (5 levels multires, 26mln polys, 52mln tris): %.2f fps\n\n\n" % (fps30, fps31))
-            #result.write("Screen resolution : %s x %s\nVBOs: %s\nAnisotropic filter: %s\nDraw method: %s\nMulti sample: %s\nMipmaps: %s\nGPU Mipmap: %s\n" % (width, height, vbos, af, draw_met, view_aa, mip, mipgpu))
-        
-
-            avg_fps = (fps10+ fps11 + fps12 + fps13 + fps14)/5
-            total_fps = fps10+ fps11 + fps12 + fps13 + fps14
-            result.write("SCORE TOTAL\n%s\n" % ("="*score_max))
-            result.write("FPS (avg/total): %.2f / %.2f\n" % (avg_fps, total_fps))
-            result.write("Time: %i min %i sec\n" % (timeovmin, timeovsec))
+            writeReport(self, benchtime, fps10, fps11, fps12, fps13, fps14)
             
             bpy.ops.screen.back_to_previous()
             #restore user render fps settings
             bpy.data.scenes['Scene'].render.fps = user_fps
             area.type = 'TEXT_EDITOR'
-            
+
             return {'FINISHED'}
 
 
+def writeReport(self, benchtime, fps10, fps11, fps12, fps13, fps14):
+    timeov = round(time.time() - benchtime)
+    timeovmin = int(timeov / 60)
+    timeovsec = timeov - (timeovmin * 60)
+
+    score_max = 60
+    fps_highscore = 512   
+     
+    #create result file
+    try:
+        bpy.data.texts['Benchmark_Result']
+    except:
+        bpy.ops.text.new()
+        bpy.data.texts['Text'].name = 'Benchmark_Result'
+    result = bpy.data.texts['Benchmark_Result']
+
+
+    system = bpy.context.preferences.system
+    version = str(bpy.app.version)
+    hash = bpy.app.build_hash
+    build_plat = bpy.app.build_platform
+    build_date = bpy.app.build_date
+
+    #vbos = system.use_vertex_buffer_objects
+    af0 = system.anisotropic_filter
+    if af0 == "FILTER_0":
+        af = "Off"
+    else:
+        af = af0[7:] + "x"
+    draw_met = system.image_draw_method
+    view_aa = system.viewport_aa
+    #mip = system.use_mipmaps
+    #mipgpu = system.use_gpu_mipmap
+
+    #report System specs
+    result.clear()
+    result.write("BLENDER VIEWPORT BENCHMARK\n%s\n" % ("="*score_max))
+    result.write("Blender version: %s\nRevision: %s , %s\nPlatform: %s\n\n" % (version, hash, build_date, build_plat))
+
+    import platform
+    platformProcessor = platform.processor()
+    result.write("CPU:\t%r\n" % (platformProcessor))
+    result.write("GPU:\t%r\n" % bgl.glGetString(bgl.GL_RENDERER))
+    result.write("GPU Driver:\t%r\n\n" % (bgl.glGetString(bgl.GL_VERSION)))
+    
+    result.write("test %s %s" % (bpy.app.debug_gpumem, bpy.app.build_system))
+    #cpu = cpuinfo.get_cpu_info()['brand']
+    #result.write("CPU:\t%r\n%r\n\n" % (cpu))
+    #import _cycles
+    #print(_cycles.get_device_types())
+    result.write("SCORES BENCHMARKS\n%s\n" % ("="*score_max))
+    #result.write("Object mode\n")
+    #result.write("Wireframe\n (4150 polys with 5 levels subsurf*, 4.2mln polys, 8.5mln tris): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps10, fps20, fps41))
+    #result.write("Solid\n (5 levels subsurf*): %.2f fps\n (8.3mln polys, 16.6mln tris): %.2f fps\n-robot (1.5mln polys*): %.2f fps\n\n" % (fps11, fps21, fps42))
+    #result.write("Material\n (225k polys): %.2f fps\n (1.5mln polys*): %.2f fps\n\n\n" % (fps40, fps43))
+
+            
+
+    result.write("Edit mode\n")
+    result.write("bench 1\n %.2f fps\n" % fps10)
+    bench_score = int(score_max/fps_highscore*fps10)
+    result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+    result.write("bench 1 \n %.2f fps\n" % fps11)
+    bench_score = int(score_max/fps_highscore*fps11)
+    result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+    result.write("Wireframe\n %.2f fps\n" % fps12)
+    bench_score = int(score_max/fps_highscore*fps12)
+    result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+    result.write("Hiddenwire\n %.2f fps\n" % fps13)
+    bench_score = int(score_max/fps_highscore*fps13)
+    result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+    result.write("Solid\n %.2f fps\n" % fps14)
+    bench_score = int(score_max/fps_highscore*fps14)
+    result.write("%s%s|\n\n" % (("#"*bench_score),("-"*(score_max-bench_score))))
+
+    
+    #result.write("Sculpt mode\n")
+    #result.write("Solid matcap\n (25k polys with 4 levels multires, 6.5mln polys, 13mln tris): %.2f fps\n (5 levels multires, 26mln polys, 52mln tris): %.2f fps\n\n\n" % (fps30, fps31))
+    #result.write("Screen resolution : %s x %s\nVBOs: %s\nAnisotropic filter: %s\nDraw method: %s\nMulti sample: %s\nMipmaps: %s\nGPU Mipmap: %s\n" % (width, height, vbos, af, draw_met, view_aa, mip, mipgpu))
+
+
+    avg_fps = (fps10+ fps11 + fps12 + fps13 + fps14)/5
+    total_fps = fps10+ fps11 + fps12 + fps13 + fps14
+    result.write("SCORE TOTAL\n%s\n" % ("="*score_max))
+    result.write("FPS (avg/total): %.2f / %.2f\n" % (avg_fps, total_fps))
+    result.write("Time: %i min %i sec\n" % (timeovmin, timeovsec))
+    
+
+
 classes = (
-    #VPB_OT_RunBenchmark, 
+    VPB_OT_RunBenchmark, 
     BenchmarkOperator,
-    #AppTimersOperator,
+    AppTimersOperator,
     preferences.ViewportBenchmarkPreferences,
     ) 
 
