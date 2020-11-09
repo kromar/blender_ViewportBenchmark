@@ -131,7 +131,7 @@ class BenchmarkOperator(bpy.types.Operator):
         self._view_3d.view_rotation = eul.to_quaternion()
 
         #calculate fps
-        if pref.is_benchmark:
+        if pref.is_benchmark: # run benchmark
             #print("angle: ", self._angle)
             self._angle += pref.angle_steps
 
@@ -147,15 +147,16 @@ class BenchmarkOperator(bpy.types.Operator):
                 
                 print(self._bench_index, len(self.benchmarkList))
                 if self._bench_index == len(self.benchmarkList): 
-                    bench_finish = True
+                    bench_finish = True 
+                    #bpy.ops.screen.back_to_previous()     # this crashes blender https://developer.blender.org/T82552
                     context.window_manager.event_timer_remove(self._modal_timer) 
                 else:
                     bench_finish = False                 
                     
                 return bench_finish
-        else:            
+        else:   #run stress-test   (could be a predefined time or amount of loops)   
             pass
-
+        
     def modal(self, context, event):
         pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
         
