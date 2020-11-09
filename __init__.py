@@ -141,7 +141,6 @@ class BenchmarkOperator(bpy.types.Operator):
                 fps = round((1 / ( (time_stop-self._time_start)/int(360 * pref.loops))), 4)
                 print("FPS: ", fps)                
                 
-                #context.window_manager.event_timer_remove(self._modal_timer) 
                 self._time_start = 0
                 self._angle = 0                
                 self._bench_index += 1
@@ -149,6 +148,7 @@ class BenchmarkOperator(bpy.types.Operator):
                 print(self._bench_index, len(self.benchmarkList))
                 if self._bench_index == len(self.benchmarkList): 
                     bench_finish = True
+                    context.window_manager.event_timer_remove(self._modal_timer) 
                 else:
                     bench_finish = False                 
                     
