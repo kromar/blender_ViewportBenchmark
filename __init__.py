@@ -50,10 +50,12 @@ bl_info = {
 benchResults = {}
 
 
+def prefs():
+    user_preferences = bpy.context.preferences
+    return user_preferences.addons[__package__].preferences 
+
 def draw_button(self, context):
-    #pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences    
-    
-    #if pref.button_toggle:
+    #if prefs().button_toggle:
     if context.region.alignment == 'RIGHT':
         layout = self.layout
         row = layout.row(align=True)  
@@ -67,8 +69,7 @@ def draw_button(self, context):
 class BenchmarkOperator(bpy.types.Operator):
     """Operator which runs its self from a timer"""
     bl_idname = "wm.modal_timer_operator"
-    bl_label = "Modal Timer Operator"
-    
+    bl_label = "Modal Timer Operator"    
     
     _view_3d = None
     _modal_timer = None
@@ -84,11 +85,11 @@ class BenchmarkOperator(bpy.types.Operator):
     def poll(cls, context):
         return context.selected_objects   """
     
-    def initializeView(self, context, pref):       
+    def initializeView(self, context, prefs()):       
         view = bpy.context.screen.areas[0].spaces.active     
-        self._view_3d.view_location = (0.0 , 0.0 , pref.view_z_pos)
-        self._view_3d.view_distance = pref.view_distance 
-        eul = Euler((math.radians(pref.view_angle), 0.0 , 0.0), 'XYZ')
+        self._view_3d.view_location = (0.0 , 0.0 , prefs().view_z_pos)
+        self._view_3d.view_distance = prefs().view_distance 
+        eul = Euler((math.radians(prefs().view_angle), 0.0 , 0.0), 'XYZ')
         quat = eul.to_quaternion()         
         self._view_3d.view_rotation = quat
 
@@ -116,29 +117,28 @@ class BenchmarkOperator(bpy.types.Operator):
         return {'CANCELED'}
 
 
-    def execute(self, context):        
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+    def execute(self, context):    
         wm = context.window_manager
-        self._modal_timer = wm.event_timer_add(1/pref.max_render_fps, window=context.window)
+        self._modal_timer = wm.event_timer_add(1/prefs().max_render_fps, window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
 
-    def runBenchmark(self, context, pref):           
+    def runBenchmark(self, context, prefs()):           
         #run rotation
         eul = self._view_3d.view_rotation.to_euler()            
-        eul.z = eul.z + math.radians(pref.angle_steps)
+        eul.z = eul.z + math.radians(prefs().angle_steps)
         self._view_3d.view_rotation = eul.to_quaternion()
 
         #calculate fps
-        if pref.is_benchmark: # run benchmark
+        if prefs().is_benchmark: # run benchmark
             #print("angle: ", self._angle)
-            self._angle += pref.angle_steps
+            self._angle += prefs().angle_steps
 
-            if self._angle == int(360 * pref.loops):
+            if self._angle == int(360 * prefs().loops):
                 time_stop = time.time() 
                 #print(self._angle, "\n", self._time_start, "\n", time_stop, "\n", (time_stop-self._time_start))
-                fps = round((1 / ( (time_stop-self._time_start)/int(360 * pref.loops))), 4)
+                fps = round((1 / ( (time_stop-self._time_start)/int(360 * prefs().loops))), 4)
                 print("FPS: ", fps)                
                 
                 self._time_start = 0
@@ -157,8 +157,7 @@ class BenchmarkOperator(bpy.types.Operator):
         else:   #run stress-test   (could be a predefined time or amount of loops)   
             pass
         
-    def modal(self, context, event):
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+    def modal(self, context, event):        
         
         if event.type in {'ESC'}:
             self.cancel(context)
@@ -169,14 +168,14 @@ class BenchmarkOperator(bpy.types.Operator):
         if event.type == 'TIMER': 
             #preapre setting for benchmark
             if self._time_start == 0:
-                self.initializeView(context, pref)
+                self.initializeView(context, prefs())
 
             #initialize benchmark
-            bench_finish = self.runBenchmark(context, pref)
+            bench_finish = self.runBenchmark(context, prefs())
             if bench_finish:
                 return {'FINISHED'}
 
-        if pref.is_interactive:
+        if prefs().is_interactive:
             return {'PASS_THROUGH'}
         else:
             return {'RUNNING_MODAL'}
@@ -186,7 +185,7 @@ class BenchmarkOperator(bpy.types.Operator):
 
     def invoke(self, context, event): 
 
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+        
         for window in context.window_manager.windows:
             screen = window.screen
             for area in screen.areas:
@@ -197,7 +196,7 @@ class BenchmarkOperator(bpy.types.Operator):
                     """ bpy.context.space_data.show_gizmo = False
                     bpy.context.space_data.overlay.show_overlays = False   """
         
-        bpy.data.scenes['Scene'].render.fps = pref.max_render_fps
+        bpy.data.scenes['Scene'].render.fps = prefs().max_render_fps
                 
         self.execute(context)
         return {'RUNNING_MODAL'}
@@ -216,34 +215,31 @@ class AppTimersOperator(bpy.types.Operator):
     _report_bar_width = 60
     #_angle_target = int(360 * 10)
 
-    def runbenchmark(self):
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+    def runbenchmark(self):        
         eul = self._view_3d.view_rotation.to_euler()
-        eul.z = eul.z + math.radians(pref.angle_steps)
+        eul.z = eul.z + math.radians(prefs().angle_steps)
         quat = eul.to_quaternion()         
         self._view_3d.view_rotation = quat
         
-        self._counter += pref.angle_steps
+        self._counter += prefs().angle_steps
         #print(self._counter)
 
-        if self._counter == int(360 * pref.loops):            
+        if self._counter == int(360 * prefs().loops):            
             bpy.ops.screen.back_to_previous()
             return None            
-        return 1/pref.max_render_fps
+        return 1/prefs().max_render_fps
 
         
     def execute(self,context):  
-        bpy.app.timers.register(self.runbenchmark)          
+        bpy.app.timers.register(self.runbenchmark)    
         
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
-        if pref.is_interactive:
+        if prefs().is_interactive:
             return {'PASS_THROUGH'}
         else:
             return {'RUNNING_MODAL'}
 
 
-    def invoke(self, context, event):     
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences  
+    def invoke(self, context, event):  
         for window in bpy.context.window_manager.windows:
             screen = window.screen
             for area in screen.areas:
@@ -252,12 +248,12 @@ class AppTimersOperator(bpy.types.Operator):
                     bpy.ops.screen.screen_full_area(override)                     
 
         self._view_3d = bpy.context.screen.areas[0].spaces[0].region_3d            
-        bpy.data.scenes['Scene'].render.fps = pref.max_render_fps
+        bpy.data.scenes['Scene'].render.fps = prefs().max_render_fps
 
         #initialize view
-        self._view_3d.view_location = (0.0 , 0.0 , pref.view_z_pos)
-        self._view_3d.view_distance = pref.view_distance 
-        eul = Euler((math.radians(pref.view_angle), 0.0 , 0.0), 'XYZ')
+        self._view_3d.view_location = (0.0 , 0.0 , prefs().view_z_pos)
+        self._view_3d.view_distance = prefs().view_distance 
+        eul = Euler((math.radians(prefs().view_angle), 0.0 , 0.0), 'XYZ')
         quat = eul.to_quaternion()         
         self._view_3d.view_rotation = quat
 
@@ -316,7 +312,7 @@ class VPB_OT_RunBenchmark(Operator):
 
         
     def execute(self, context):       
-        pref = bpy.context.preferences.addons[__package__.split(".")[0]].preferences
+        
         #set 3d view as context to run benchmark
         for window in bpy.context.window_manager.windows:
             screen = window.screen
@@ -348,7 +344,7 @@ class VPB_OT_RunBenchmark(Operator):
             distance = 15.0
             angle = 80.0    
             z_pos = 4.0      
-            deg = int(360 * pref.loops)
+            deg = int(360 * prefs().loops)
 
             mod_subdiv = 0
             benchtime = time.time()
