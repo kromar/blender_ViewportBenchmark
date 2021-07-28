@@ -85,7 +85,7 @@ class BenchmarkOperator(bpy.types.Operator):
     def poll(cls, context):
         return context.selected_objects   """
     
-    def initializeView(self, context, prefs()):       
+    def initializeView(self, context):       
         view = bpy.context.screen.areas[0].spaces.active     
         self._view_3d.view_location = (0.0 , 0.0 , prefs().view_z_pos)
         self._view_3d.view_distance = prefs().view_distance 
@@ -124,7 +124,7 @@ class BenchmarkOperator(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-    def runBenchmark(self, context, prefs()):           
+    def runBenchmark(self, context):           
         #run rotation
         eul = self._view_3d.view_rotation.to_euler()            
         eul.z = eul.z + math.radians(prefs().angle_steps)
@@ -168,10 +168,10 @@ class BenchmarkOperator(bpy.types.Operator):
         if event.type == 'TIMER': 
             #preapre setting for benchmark
             if self._time_start == 0:
-                self.initializeView(context, prefs())
+                self.initializeView(context)
 
             #initialize benchmark
-            bench_finish = self.runBenchmark(context, prefs())
+            bench_finish = self.runBenchmark(context)
             if bench_finish:
                 return {'FINISHED'}
 
