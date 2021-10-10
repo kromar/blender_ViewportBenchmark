@@ -105,7 +105,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     is_interactive: BoolProperty(
         name="is_interactive",
         description="is_interactive",
-        default=True)    
+        default=False)    
   
     def draw(self, context):
         layout = self.layout        

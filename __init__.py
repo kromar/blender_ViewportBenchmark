@@ -60,15 +60,15 @@ def draw_button(self, context):
         layout = self.layout
         row = layout.row(align=True)  
                
-        row.operator(operator="wm.modal_timer_operator", text="modal", icon='MONKEY', emboss=True, depress=False)
-        row.operator(operator="viewport_benchmark.run", text="old", icon='MONKEY', emboss=True, depress=False)
-        row.operator(operator="wm.benchmark", text="timer", icon='MEMORY', emboss=True, depress=False)
+        row.operator(operator="benchmark_modal.run", text="modal", icon='MONKEY', emboss=True, depress=False)
+        row.operator(operator="benchmark_timer.run", text="timer", icon='MEMORY', emboss=True, depress=False)
+        row.operator(operator="benchmark_old.run", text="old", icon='MONKEY', emboss=True, depress=False)
         
 
 
-class BenchmarkOperator(bpy.types.Operator):
+class BenchmarkModal(bpy.types.Operator):
     """Operator which runs its self from a timer"""
-    bl_idname = "wm.modal_timer_operator"
+    bl_idname = "benchmark_modal.run"
     bl_label = "Modal Timer Operator"    
     
     _view_3d = None
@@ -98,15 +98,6 @@ class BenchmarkOperator(bpy.types.Operator):
         view.shading.type = self.benchmarkList[self._bench_index]
         #start timer        
         self._time_start = time.time()
-        return
-
-
-    def restoreDefaults(self, context):
-        #restore defaults
-        """ bpy.context.space_data.show_gizmo = True
-        bpy.context.space_data.overlay.show_overlays = True   
-        if bpy.ops.screen.back_to_previous.poll():
-        bpy.ops.screen.back_to_previous() """
         return
 
 
@@ -145,6 +136,8 @@ class BenchmarkOperator(bpy.types.Operator):
                 self._angle = 0                
                 self._bench_index += 1
                 
+
+                
                 print(self._bench_index, len(self.benchmarkList))
                 if self._bench_index == len(self.benchmarkList): 
                     bench_finish = True 
@@ -157,13 +150,12 @@ class BenchmarkOperator(bpy.types.Operator):
         else:   #run stress-test   (could be a predefined time or amount of loops)   
             pass
         
-    def modal(self, context, event):        
-        
+
+    def modal(self, context, event):  
         if event.type in {'ESC'}:
             self.cancel(context)
             context.window_manager.event_timer_remove(self._modal_timer)
             return {'CANCELLED'}
-
 
         if event.type == 'TIMER': 
             #preapre setting for benchmark
@@ -172,7 +164,8 @@ class BenchmarkOperator(bpy.types.Operator):
 
             #initialize benchmark
             bench_finish = self.runBenchmark(context)
-            if bench_finish:
+            if bench_finish:     
+                self.finishBenchmark(context)           
                 return {'FINISHED'}
 
         if prefs().is_interactive:
@@ -181,11 +174,18 @@ class BenchmarkOperator(bpy.types.Operator):
             return {'RUNNING_MODAL'}
 
 
+    def finishBenchmark(self, context):
+        #restore defaults
+        if bpy.ops.screen.back_to_previous.poll():
+            bpy.ops.screen.back_to_previous()
+        #context.window_manager.event_timer_remove(self._modal_timer)
+        #bpy.context.space_data.show_gizmo = True
+        #bpy.context.space_data.overlay.show_overlays = True 
+        print("="*80, end="\n")
+        return {'FINISHED'}
 
 
-    def invoke(self, context, event): 
-
-        
+    def invoke(self, context, event):         
         for window in context.window_manager.windows:
             screen = window.screen
             for area in screen.areas:
@@ -203,9 +203,9 @@ class BenchmarkOperator(bpy.types.Operator):
 
 
 
-class AppTimersOperator(bpy.types.Operator):
+class BenchmarkTimer(bpy.types.Operator):
     """Run Benchmark"""
-    bl_idname = "wm.benchmark"
+    bl_idname = "benchmark_timer.run"
     bl_label = "Run Benchmark"
 
     _counter = 0
@@ -262,9 +262,9 @@ class AppTimersOperator(bpy.types.Operator):
         
 
 
-class VPB_OT_RunBenchmark(Operator): 
+class BenchmarkOLD(Operator): 
     """Run Viewport Benchmark""" 
-    bl_idname = "viewport_benchmark.run" 
+    bl_idname = "benchmark_old.run" 
     bl_label = "Run Viewport Benchmark" 
         
 
@@ -512,9 +512,9 @@ def writeReport(self, benchtime, fps10, fps11, fps12, fps13, fps14):
 
 
 classes = (
-    VPB_OT_RunBenchmark, 
-    BenchmarkOperator,
-    AppTimersOperator,
+    BenchmarkOLD, 
+    BenchmarkModal,
+    BenchmarkTimer,
     preferences.ViewportBenchmarkPreferences,
     ) 
 
