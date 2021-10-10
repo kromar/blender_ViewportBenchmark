@@ -68,9 +68,9 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     max_render_fps: FloatProperty(
         name="max_render_fps",
         description="max_render_fps",
-        default=1000,
-        min = 0,
-        soft_max=1000,
+        default=60,
+        min = 1,
+        soft_max=240,
         step=1,
         precision=0,
         subtype='FACTOR') 
@@ -89,10 +89,10 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         name="angle_steps",
         description="angle_steps",
         default=1,
-        min = 1,
-        soft_max=10,
+        min = 0.01,
+        soft_max=4,
         step=1,
-        precision=0,
+        precision=2,
         subtype='FACTOR') 
 
     
@@ -100,7 +100,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     debug_mode: BoolProperty(
         name="debug_mode",
         description="debug_mode",
-        default=True)
+        default=False)
     
     is_interactive: BoolProperty(
         name="is_interactive",
@@ -110,7 +110,6 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     def draw(self, context):
         layout = self.layout        
         layout.use_property_split = True
-
         
         col = layout.column(align=True)
         col.prop(self, 'max_render_fps') 

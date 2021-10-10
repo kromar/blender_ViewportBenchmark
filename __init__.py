@@ -60,26 +60,31 @@ def draw_button(self, context):
         layout = self.layout
         row = layout.row(align=True)  
                
-        row.operator(operator="benchmark_modal.run", text="modal", icon='MONKEY', emboss=True, depress=False)
-        row.operator(operator="benchmark_timer.run", text="timer", icon='MEMORY', emboss=True, depress=False)
-        row.operator(operator="benchmark_old.run", text="old", icon='MONKEY', emboss=True, depress=False)
+        row.operator(operator="benchmark_modal.run", text="Benchmark", icon='MONKEY', emboss=True, depress=False)
+        #row.operator(operator="benchmark_timer.run", text="timer", icon='MEMORY', emboss=True, depress=False)
+        #row.operator(operator="benchmark_old.run", text="old", icon='MONKEY', emboss=True, depress=False)
         
 
 
 class BenchmarkModal(bpy.types.Operator):
     """Operator which runs its self from a timer"""
     bl_idname = "benchmark_modal.run"
-    bl_label = "Modal Timer Operator"    
-    
+    bl_label = "Modal Timer Operator"  
     _view_3d = None
     _modal_timer = None
-    _angle = 0 
-    _bench_index = 0  
-
+    _angle = 0  
     _time_start = 0
     _report_bar_width = 60
+    _rotation = 360
+    _benchmark_score = []
     
-    benchmarkList = ['WIREFRAME', 'SOLID', 'MATERIAL', 'RENDERED']
+    _bench_index = 0 
+    benchmarkList = [
+                    'WIREFRAME', 
+                    'SOLID', 
+                    'MATERIAL', 
+                    'RENDERED',
+                    ]
 
     """ @classmethod
     def poll(cls, context):
@@ -95,8 +100,7 @@ class BenchmarkModal(bpy.types.Operator):
 
         #rendering configs
         print("benchamrk mode: ", self.benchmarkList[self._bench_index])
-        view.shading.type = self.benchmarkList[self._bench_index]
-        #start timer        
+        view.shading.type = self.benchmarkList[self._bench_index]     
         self._time_start = time.time()
         return
 
@@ -108,47 +112,63 @@ class BenchmarkModal(bpy.types.Operator):
         return {'CANCELED'}
 
 
-    def execute(self, context):    
-        wm = context.window_manager
+    def execute(self, context):   
+        self._benchmark_score = [] 
+        wm = context.window_manager        
         self._modal_timer = wm.event_timer_add(1/prefs().max_render_fps, window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
 
-    def runBenchmark(self, context):           
-        #run rotation
+    def runBenchmark(self, context): 
         eul = self._view_3d.view_rotation.to_euler()            
         eul.z = eul.z + math.radians(prefs().angle_steps)
         self._view_3d.view_rotation = eul.to_quaternion()
+        
+        if prefs().is_benchmark: 
+            # run benchmark            
+            time_start = time.time()
+            self._angle += prefs().angle_steps            
+            # measure draw time
+            if bpy.ops.wm.redraw_timer.poll():          
+                bpy.ops.wm.redraw_timer(type='DRAW', iterations=1) 
+            frame_time = (time.time() - time_start)
+            self._benchmark_score.append(1/frame_time)
+            
+            if prefs().debug_mode:
+                print("angle: ", int(self._angle))
+                print("frame_time: ", frame_time*1000, "ms")
+                print("fps: ", 1/frame_time, "fps\n")              
 
-        #calculate fps
-        if prefs().is_benchmark: # run benchmark
-            #print("angle: ", self._angle)
-            self._angle += prefs().angle_steps
-
-            if self._angle == int(360 * prefs().loops):
-                time_stop = time.time() 
+            if self._angle == int(self._rotation * prefs().loops):
                 #print(self._angle, "\n", self._time_start, "\n", time_stop, "\n", (time_stop-self._time_start))
-                fps = round((1 / ( (time_stop-self._time_start)/int(360 * prefs().loops))), 4)
-                print("FPS: ", fps)                
-                
+                 
                 self._time_start = 0
                 self._angle = 0                
                 self._bench_index += 1
-                
+                if prefs().debug_mode:
+                    print(self._bench_index, len(self.benchmarkList))
 
-                
-                print(self._bench_index, len(self.benchmarkList))
                 if self._bench_index == len(self.benchmarkList): 
                     bench_finish = True 
                     #bpy.ops.screen.back_to_previous()     # this crashes blender https://developer.blender.org/T82552
                     context.window_manager.event_timer_remove(self._modal_timer) 
                 else:
-                    bench_finish = False                 
-                    
+                    bench_finish = False  
+
+                #calcualte scores
+                score = sum(self._benchmark_score)
+                print("Average FPS: ", round(score/self._rotation,2))
+                print("Score: ", round(score,2))   
+                self._benchmark_score = []             
+                
                 return bench_finish
+            
+           
+
         else:   #run stress-test   (could be a predefined time or amount of loops)   
             pass
+        
         
 
     def modal(self, context, event):  
@@ -181,6 +201,8 @@ class BenchmarkModal(bpy.types.Operator):
         #context.window_manager.event_timer_remove(self._modal_timer)
         #bpy.context.space_data.show_gizmo = True
         #bpy.context.space_data.overlay.show_overlays = True 
+        # Example to find avearge of list
+
         print("="*80, end="\n")
         return {'FINISHED'}
 
