@@ -1,0 +1,20 @@
+{
+    "benchmark version: ": "1.0.0",
+    "blender_version": "2.83",
+    "Revision": "b'3e85bb34d0d7' , b'2020-09-23'",
+    "Platform": "b'Windows'",    
+    "CPU": "Intel64 Family 6 Model 158 Stepping 10, GenuineIntel",
+    "GPU": "GeForce RTX 2070 with Max-Q Design/PCIe/SSE2",
+    "GPU Driver": "4.5.0 NVIDIA 456.71",
+
+        "benchmark": {
+            "bench1": {"fps": "124.32 fps",
+                },
+            "bench2": {"fps": "124.32 fps",
+            },
+            
+            "total_FPS" : " 111.26 / 556.28",
+            "total_Time" : "0 min 20 sec"            
+        }
+}
+
