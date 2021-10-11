@@ -78,7 +78,7 @@ class BenchmarkModal(bpy.types.Operator):
     _rotation = 360
     _benchmark_score = []
     
-    _bench_index = 0 
+    _bench_shading_type = 0 
     benchmarkList = [
                     'WIREFRAME', 
                     'SOLID', 
@@ -99,8 +99,8 @@ class BenchmarkModal(bpy.types.Operator):
         self._view_3d.view_rotation = quat
 
         #rendering configs
-        print("benchamrk mode: ", self.benchmarkList[self._bench_index])
-        view.shading.type = self.benchmarkList[self._bench_index]     
+        print("benchamrk mode: ", self.benchmarkList[self._bench_shading_type])
+        view.shading.type = self.benchmarkList[self._bench_shading_type]     
         self._time_start = time.time()
         return
 
@@ -133,7 +133,10 @@ class BenchmarkModal(bpy.types.Operator):
             if bpy.ops.wm.redraw_timer.poll():          
                 bpy.ops.wm.redraw_timer(type='DRAW', iterations=1) 
             frame_time = (time.time() - time_start)
+            #self._benchmark_score = {self.benchmarkList[self._bench_shading_type]}
+            #self._benchmark_score[self._bench_shading_type] = self.benchmarkList[self._bench_shading_type]
             self._benchmark_score.append(1/frame_time)
+            #print(self.benchmarkList[self._bench_shading_type])
             
             if prefs().debug_mode:
                 print("angle: ", int(self._angle))
@@ -145,11 +148,11 @@ class BenchmarkModal(bpy.types.Operator):
                  
                 self._time_start = 0
                 self._angle = 0                
-                self._bench_index += 1
+                self._bench_shading_type += 1
                 if prefs().debug_mode:
-                    print(self._bench_index, len(self.benchmarkList))
+                    print(self._bench_shading_type, len(self.benchmarkList))
 
-                if self._bench_index == len(self.benchmarkList): 
+                if self._bench_shading_type == len(self.benchmarkList): 
                     bench_finish = True 
                     #bpy.ops.screen.back_to_previous()     # this crashes blender https://developer.blender.org/T82552
                     context.window_manager.event_timer_remove(self._modal_timer) 
@@ -159,8 +162,10 @@ class BenchmarkModal(bpy.types.Operator):
                 #calcualte scores
                 score = sum(self._benchmark_score)
                 print("Average FPS: ", round(score/self._rotation,2))
-                print("Score: ", round(score,2))   
-                self._benchmark_score = []             
+                print("Score: ", round(score,2)) 
+                self.ShowReport(["Average FPS: " + str(round(score/self._rotation,2)), "Score: " + str(round(score,2))], self.benchmarkList[self._bench_shading_type-1], 'SHADING_RENDERED')   
+                self._benchmark_score = []     
+                        
                 
                 return bench_finish
             
@@ -169,7 +174,11 @@ class BenchmarkModal(bpy.types.Operator):
         else:   #run stress-test   (could be a predefined time or amount of loops)   
             pass
         
-        
+    def ShowReport(self, message = [], title = "Message Box", icon = 'INFO'):
+        def draw(self, context):
+            for i in message:
+                self.layout.label(text=i)
+        bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)  
 
     def modal(self, context, event):  
         if event.type in {'ESC'}:
