@@ -38,7 +38,7 @@ bl_info = {
     "name": "Viewport Benchmark",
     "description": "Viewport Benchmark",
     "author": "Daniel Grauer",
-    "version": (1, 0, 1),
+    "version": (1, 0, 2),
     "blender": (2, 93, 0),
     "location": "Header",
     "category": "System",
@@ -86,8 +86,8 @@ class BenchmarkModal(bpy.types.Operator):
                                 
     benchmark_config = {
         'shading_type': {
-            'WIREFRAME': {'Enabled': True, 'score':[]},
-            'SOLID': {'Enabled': True, 'score':[]},
+            'WIREFRAME': {'Enabled': False, 'score':[]},
+            'SOLID': {'Enabled': False, 'score':[]},
             'MATERIAL': {'Enabled': True, 'score':[]},
             'RENDERED': {'Enabled': True, 'score':[]},
         },
@@ -132,7 +132,7 @@ class BenchmarkModal(bpy.types.Operator):
     def poll(cls, context):
         return context.selected_objects   """
     
-    def initializeView(self, context):       
+    def initializeView(self, context, value):       
         view = bpy.context.screen.areas[0].spaces.active     
         self._view_3d.view_location = (0.0 , 0.0 , prefs().view_z_pos)
         self._view_3d.view_distance = prefs().view_distance 
@@ -141,9 +141,9 @@ class BenchmarkModal(bpy.types.Operator):
         self._view_3d.view_rotation = quat
 
         #rendering configs
-        print("benchamrk mode: ", self.benchmarkList[self._bench_shading_type])
-        view.shading.type = self.benchmarkList[self._bench_shading_type]     
-        self._time_start = time.perf_counter()
+        print("benchamrk mode: ", value)
+        view.shading.type = value     
+        #self._time_start = time.perf_counter()
         return
 
 
@@ -162,63 +162,46 @@ class BenchmarkModal(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-    def runBenchmark(self, context): 
+    def runBenchmark(self, context, value):     
         eul = self._view_3d.view_rotation.to_euler()            
         eul.z = eul.z + math.radians(prefs().angle_steps)
         self._view_3d.view_rotation = eul.to_quaternion()
         
-        if prefs().is_benchmark: 
-            # run benchmark            
-            self._time_start = time.perf_counter()
-            self._angle += prefs().angle_steps            
-            # measure draw time
-            if bpy.ops.wm.redraw_timer.poll():          
-                bpy.ops.wm.redraw_timer(type='DRAW', iterations=1) 
-            frame_time = (time.perf_counter() - self._time_start)
-            #self._benchmark_score = {self.benchmarkList[self._bench_shading_type]}
-            #self._benchmark_score[self._bench_shading_type] = self.benchmarkList[self._bench_shading_type]
-            self._benchmark_score.append(1/frame_time)
-            #print(self.benchmarkList[self._bench_shading_type])
-            
-            if prefs().debug_mode:
-                print("angle: ", int(self._angle))
-                print("frame_time: ", frame_time*1000, "ms")
-                print("fps: ", 1/frame_time, "fps\n")             
+        # run benchmark            
+        self._time_start = time.perf_counter()
+        self._angle += prefs().angle_steps            
+        # measure draw time
+        if bpy.ops.wm.redraw_timer.poll():          
+            bpy.ops.wm.redraw_timer(type='DRAW', iterations=1) 
+        frame_time = (time.perf_counter() - self._time_start)
+        self.benchmark_config['shading_type'][value]['score'].append(1/frame_time)
 
-            if self._angle == int(self._rotation * prefs().loops):
-                #print(self._angle, "\n", self._time_start, "\n", time_stop, "\n", (time_stop-self._time_start))
-                 
-                self._time_start = 0
-                self._angle = 0                
-                self._bench_shading_type += 1
-                if prefs().debug_mode:
-                    print(self._bench_shading_type, len(self.benchmarkList))
-
-                if self._bench_shading_type == len(self.benchmarkList): 
-                    bench_finish = True 
-                    #bpy.ops.screen.back_to_previous()     # this crashes blender https://developer.blender.org/T82552
-                    context.window_manager.event_timer_remove(self._modal_timer) 
-                else:
-                    bench_finish = False  
-
-                #calcualte scores
-                score = sum(self._benchmark_score)
-                print("Average FPS: ", round(score/self._rotation,2))
-                print("Score: ", round(score,2)) 
-                self.ShowReport(["Average FPS: " + str(round(score/self._rotation,2)), "Score: " + str(round(score,2))], self.benchmarkList[self._bench_shading_type-1], 'SHADING_RENDERED')   
-                
-                self._benchmark_score = []     
-                        
-                
-                return bench_finish
-            
-           
-
-        else:   #run stress-test   (could be a predefined time or amount of loops)   
-            pass
+        #print(self.benchmarkList[self._bench_shading_type])
         
+        if prefs().debug_mode:
+            print("angle: ", int(self._angle))
+            print("frame_time: ", frame_time * 1000, "ms")
+            print("fps: ", 1 / frame_time, "fps\n")             
 
+        print(self._angle, int(self._rotation * prefs().loops)) 
+        
+        if round(self._angle) == int(self._rotation * prefs().loops):         
+            self._time_start = 0
+            self._angle = 0             
+            #bpy.ops.screen.back_to_previous()     # this crashes blender https://developer.blender.org/T82552
+            context.window_manager.event_timer_remove(self._modal_timer) 
 
+            #calcualte scores
+            score = sum(self._benchmark_score)
+            print("Average FPS: ", round(score/self._rotation,2))
+            print("Score: ", round(score,2)) 
+            self.ShowReport(["Average FPS: " + str(round(score/self._rotation,2)), "Score: " + str(round(score,2))], self.benchmarkList[self._bench_shading_type-1], 'SHADING_RENDERED')   
+        
+            bench_finish = True 
+            return bench_finish
+        else:
+            bench_finish = False  
+        
 
     def ShowReport(self, message = [], title = "Message Box", icon = 'INFO'):
         import platform
@@ -243,16 +226,19 @@ class BenchmarkModal(bpy.types.Operator):
             context.window_manager.event_timer_remove(self._modal_timer)
             return {'CANCELLED'}
 
-        if event.type == 'TIMER': 
-            #preapre setting for benchmark
-            if self._time_start == 0:
-                self.initializeView(context)
+        if event.type == 'TIMER':             
+            for key, value in enumerate(self.benchmark_config['shading_type']):                
+                if self.benchmark_config['shading_type'][value]['Enabled']:
+                    #preapre benchmark setup
+                    if self._time_start == 0:
+                        self.initializeView(context, value)
 
-            #initialize benchmark
-            bench_finish = self.runBenchmark(context)
-            if bench_finish:     
-                self.finishBenchmark(context)           
-                return {'FINISHED'}
+                    bench_finish = self.runBenchmark(context, value)
+                    print(bench_finish)
+                
+                    if bench_finish:     
+                        self.finishBenchmark(context)   
+                        return {'FINISHED'}    
 
         if prefs().is_interactive:
             return {'PASS_THROUGH'}
@@ -272,12 +258,11 @@ class BenchmarkModal(bpy.types.Operator):
         print("="*80, end="\n")
         
         #calcualte scores
-        score = sum(self._benchmark_score)
+        score = sum(self.benchmark_config['shading_type']['WIREFRAME']['score'])
         #print("Average FPS: ", round(score/self._rotation,2))
         #print("Score: ", round(score,2)) 
-        print(self.benchmark_config['shading_type'])
         #total_score = fps10+ fps11 + fps12 + fps13 + fps14                 
-        self.ShowReport(["test", "report", "items"], "Benchmark Results", 'SHADING_RENDERED')   
+        self.ShowReport(["Total Score: " + str(round(score, 2))], "Benchmark Results", 'SHADING_RENDERED')   
         return {'FINISHED'}
 
 
