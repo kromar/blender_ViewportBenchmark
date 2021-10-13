@@ -100,7 +100,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     debug_mode: BoolProperty(
         name="debug_mode",
         description="debug_mode",
-        default=False)
+        default=True)
     
     is_interactive: BoolProperty(
         name="is_interactive",

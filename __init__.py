@@ -38,7 +38,7 @@ bl_info = {
     "name": "Viewport Benchmark",
     "description": "Viewport Benchmark",
     "author": "Daniel Grauer",
-    "version": (1, 0, 2),
+    "version": (1, 0, 3),
     "blender": (2, 93, 0),
     "location": "Header",
     "category": "System",
@@ -86,9 +86,9 @@ class BenchmarkModal(bpy.types.Operator):
                                 
     benchmark_config = {
         'shading_type': {
-            'WIREFRAME': {'Enabled': False, 'score':[]},
-            'SOLID': {'Enabled': False, 'score':[]},
-            'MATERIAL': {'Enabled': True, 'score':[]},
+            'WIREFRAME': {'Enabled': True, 'score':[]},
+            'SOLID': {'Enabled': True, 'score':[]},
+            'MATERIAL': {'Enabled': False, 'score':[]},
             'RENDERED': {'Enabled': True, 'score':[]},
         },
 
@@ -132,7 +132,7 @@ class BenchmarkModal(bpy.types.Operator):
     def poll(cls, context):
         return context.selected_objects   """
     
-    def initializeView(self, context, value):       
+    def initializeView(self, context, value):    
         view = bpy.context.screen.areas[0].spaces.active     
         self._view_3d.view_location = (0.0 , 0.0 , prefs().view_z_pos)
         self._view_3d.view_distance = prefs().view_distance 
@@ -141,9 +141,9 @@ class BenchmarkModal(bpy.types.Operator):
         self._view_3d.view_rotation = quat
 
         #rendering configs
-        print("benchamrk mode: ", value)
+        print("Init mode: ", value)
         view.shading.type = value     
-        #self._time_start = time.perf_counter()
+        self._time_start = time.perf_counter()
         return
 
 
@@ -160,50 +160,9 @@ class BenchmarkModal(bpy.types.Operator):
         self._modal_timer = wm.event_timer_add(1/prefs().max_render_fps, window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
+   
 
-
-    def runBenchmark(self, context, value):     
-        eul = self._view_3d.view_rotation.to_euler()            
-        eul.z = eul.z + math.radians(prefs().angle_steps)
-        self._view_3d.view_rotation = eul.to_quaternion()
-        
-        # run benchmark            
-        self._time_start = time.perf_counter()
-        self._angle += prefs().angle_steps            
-        # measure draw time
-        if bpy.ops.wm.redraw_timer.poll():          
-            bpy.ops.wm.redraw_timer(type='DRAW', iterations=1) 
-        frame_time = (time.perf_counter() - self._time_start)
-        self.benchmark_config['shading_type'][value]['score'].append(1/frame_time)
-
-        #print(self.benchmarkList[self._bench_shading_type])
-        
-        if prefs().debug_mode:
-            print("angle: ", int(self._angle))
-            print("frame_time: ", frame_time * 1000, "ms")
-            print("fps: ", 1 / frame_time, "fps\n")             
-
-        print(self._angle, int(self._rotation * prefs().loops)) 
-        
-        if round(self._angle) == int(self._rotation * prefs().loops):         
-            self._time_start = 0
-            self._angle = 0             
-            #bpy.ops.screen.back_to_previous()     # this crashes blender https://developer.blender.org/T82552
-            context.window_manager.event_timer_remove(self._modal_timer) 
-
-            #calcualte scores
-            score = sum(self._benchmark_score)
-            print("Average FPS: ", round(score/self._rotation,2))
-            print("Score: ", round(score,2)) 
-            self.ShowReport(["Average FPS: " + str(round(score/self._rotation,2)), "Score: " + str(round(score,2))], self.benchmarkList[self._bench_shading_type-1], 'SHADING_RENDERED')   
-        
-            bench_finish = True 
-            return bench_finish
-        else:
-            bench_finish = False  
-        
-
-    def ShowReport(self, message = [], title = "Message Box", icon = 'INFO'):
+    def CreateReport(self, message = [], title = "Message Box", icon = 'INFO'):
         import platform
         platformProcessor = platform.processor()
         cpu = str("CPU: %r" % (platformProcessor))
@@ -225,20 +184,48 @@ class BenchmarkModal(bpy.types.Operator):
             self.cancel(context)
             context.window_manager.event_timer_remove(self._modal_timer)
             return {'CANCELLED'}
-
-        if event.type == 'TIMER':             
-            for key, value in enumerate(self.benchmark_config['shading_type']):                
+        
+        
+        if event.type == 'TIMER':   
+            for key, value in enumerate(self.benchmark_config['shading_type']):
+                   
+                self._angle = 0  
                 if self.benchmark_config['shading_type'][value]['Enabled']:
-                    #preapre benchmark setup
                     if self._time_start == 0:
                         self.initializeView(context, value)
+                        
+                while self._angle <= (self._rotation * prefs().loops):               
+                    eul = self._view_3d.view_rotation.to_euler()            
+                    eul.z = eul.z + math.radians(prefs().angle_steps)
+                    self._view_3d.view_rotation = eul.to_quaternion()
 
-                    bench_finish = self.runBenchmark(context, value)
-                    print(bench_finish)
+                    self._time_start = time.perf_counter()
+                    self._angle += prefs().angle_steps 
+
+                    #print(self._angle, value, self.benchmark_config['shading_type'][value]['Enabled']) 
+                    if bpy.ops.wm.redraw_timer.poll():          
+                        bpy.ops.wm.redraw_timer(type='DRAW', iterations=1)   
+
+                    frame_time = (time.perf_counter() - self._time_start)
+                    self.benchmark_config['shading_type'][value]['score'].append(1/frame_time)
+
+                    if prefs().debug_mode==True:
+                        print(value,int(self._angle))
+                        #print("frame_time: ", frame_time * 1000, "ms")
+                        #print("fps: ", 1 / frame_time, "fps\n")            
+
+                    #print(self._angle, int(self._rotation * prefs().loops))
+                     
                 
-                    if bench_finish:     
-                        self.finishBenchmark(context)   
-                        return {'FINISHED'}    
+                #calcualte scores
+                score = sum(self.benchmark_config['shading_type'][value]['score'])
+                print("Average FPS: ", round(score/self._rotation,2))
+                print("Score: ", round(score,2)) 
+                self.CreateReport(["Average FPS: " + str(round(score/self._rotation,2)), "Score: " + str(round(score,2))], self.benchmarkList[self._bench_shading_type-1], 'SHADING_RENDERED')   
+            
+                self._time_start = 0
+            self.finishBenchmark(context)   
+            return{'FINISHED'}
 
         if prefs().is_interactive:
             return {'PASS_THROUGH'}
@@ -255,6 +242,7 @@ class BenchmarkModal(bpy.types.Operator):
         #bpy.context.space_data.overlay.show_overlays = True 
         # Example to find avearge of list
 
+        context.window_manager.event_timer_remove(self._modal_timer) 
         print("="*80, end="\n")
         
         #calcualte scores
@@ -262,7 +250,7 @@ class BenchmarkModal(bpy.types.Operator):
         #print("Average FPS: ", round(score/self._rotation,2))
         #print("Score: ", round(score,2)) 
         #total_score = fps10+ fps11 + fps12 + fps13 + fps14                 
-        self.ShowReport(["Total Score: " + str(round(score, 2))], "Benchmark Results", 'SHADING_RENDERED')   
+        self.CreateReport(["Total Score: " + str(round(score, 2))], "Benchmark Results", 'SHADING_RENDERED')   
         return {'FINISHED'}
 
 
@@ -281,9 +269,6 @@ class BenchmarkModal(bpy.types.Operator):
                 
         self.execute(context)
         return {'RUNNING_MODAL'}
-
-
-
 
 
 classes = (
