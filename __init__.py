@@ -31,7 +31,15 @@ import math
 import mathutils
 import importlib
 from mathutils import Euler, Matrix
-from bpy.types import Operator 
+from bl_operators.presets import AddPresetBase
+from bpy.types import AddonPreferences, Menu, PropertyGroup, UIList, Operator, Panel 
+from bpy.props import ( StringProperty, 
+                        BoolProperty, 
+                        FloatProperty,
+                        IntProperty,
+                        EnumProperty,
+                        CollectionProperty,
+                        )
 
 
 bl_info = {
@@ -47,12 +55,10 @@ bl_info = {
 }
 
 
-benchResults = {}
-
-
 def prefs():
     user_preferences = bpy.context.preferences
     return user_preferences.addons[__package__].preferences 
+
 
 def draw_button(self, context):
     #if prefs().button_toggle:
@@ -77,35 +83,35 @@ class BenchmarkModal(bpy.types.Operator):
     benchmark_config = {
         'shading_type': {
             'WIREFRAME': {
-                'Enabled': True, 
+                'Enabled': False, 
                 'object_mode': { 
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
             'SOLID': {
                 'Enabled': True, 
                 'object_mode': {
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
             'MATERIAL': {
                 'Enabled': True, 
                 'object_mode': {
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
             'RENDERED': {
-                'Enabled': True, 
+                'Enabled': False, 
                 'object_mode': {
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
         },
@@ -241,11 +247,9 @@ class BenchmarkModal(bpy.types.Operator):
             if self.benchmark_config['shading_type'][shading]['Enabled']:
                 for key, mode in enumerate(self.benchmark_config['shading_type'][shading]['object_mode']):
                     if self.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled']:
-
                         score = sum(self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'])
                         print("Report FPS: ", shading, mode, round(score / self._rotation * prefs().angle_steps, 2))
                         report.append([shading, mode, round(score / self._rotation * prefs().angle_steps, 2)])
-        print(report)    
 
         import platform
         platformProcessor = platform.processor()
@@ -257,22 +261,13 @@ class BenchmarkModal(bpy.types.Operator):
             self.layout.label(text=cpu)
             self.layout.label(text=gpu)
             self.layout.label(text=gpu_driver)
-            layout = self.layout  
-            for i in report:                
-                bar = int(i[2] * prefs().report_bar_width)
-                self.layout.label(text=str(i))
-                self.layout.label(text="|" + (bar * "="))
-        bpy.context.window_manager.popup_menu(draw, title = "Message Box", icon = 'INFO') 
-
-
-        #self.CreateReport(["Total Score: " + str(round(score, 2))], "Benchmark Results", 'SHADING_RENDERED')   
+             
+            for fps in report:                
+                bar = int(fps[2] * prefs().report_bar_width)
+                self.layout.label(text=str(fps[0] + " " + fps[1]))
+                self.layout.label(text="    |" + (bar * "=") + "| " + str(fps[2]))
+        bpy.context.window_manager.popup_menu(draw, title = "Benchmark Results", icon = 'SHADING_RENDERED') 
                 
-        #calcualte scores
-        #score = sum(self.benchmark_config['shading_type'][value]['score'])
-        #print("Average FPS: ", round(score/self._rotation,2))
-        #print("Score: ", round(score,2)) 
-        #total_score = fps10+ fps11 + fps12 + fps13 + fps14                 
-        #self.CreateReport(["Total Score: " + str(round(score, 2))], "Benchmark Results", 'SHADING_RENDERED')   
         return {'FINISHED'}
 
 
@@ -286,26 +281,6 @@ class BenchmarkModal(bpy.types.Operator):
                     override = {'window': window, 'screen': screen, 'area': area}
                     #bpy.ops.screen.screen_full_area(override, use_hide_panels=True)                    
        
-
-
-    def CreateReport(self, message = [], title = "Message Box", icon = 'INFO'):
-        import platform
-        platformProcessor = platform.processor()
-        cpu = str("CPU: %r" % (platformProcessor))
-        gpu = str("GPU: %r" % bgl.glGetString(bgl.GL_RENDERER))
-        gpu_driver = str("GPU Driver: %r" % (bgl.glGetString(bgl.GL_VERSION)))
-        
-       
-        def draw(self, context):
-            self.layout.label(text=cpu)
-            self.layout.label(text=gpu)
-            self.layout.label(text=gpu_driver)
-            layout = self.layout  
-            for i in message:
-                self.layout.label(text=i)
-        bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)  
-
-
 
 classes = (
     BenchmarkModal,

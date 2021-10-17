@@ -118,6 +118,8 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         default=False)    
   
     def draw(self, context):
+        
+        scene = context.scene 
         layout = self.layout        
         layout.use_property_split = True
         
@@ -141,6 +143,13 @@ class ViewportBenchmarkPreferences(AddonPreferences):
             col = layout.column(align=True)
             col.prop(self, 'is_interactive') 
             col.prop(self, 'is_benchmark') 
+
+            
+        row = layout.row(align=True)
+        col = row.column(align=True)
+
+        #template_list(listtype_name, list_id, dataptr, propname, active_dataptr, active_propname, item_dyntip_propname='', rows=5, maxrows=5, type='DEFAULT', columns=9, sort_reverse=False, sort_lock=False)
+
 
 
         
