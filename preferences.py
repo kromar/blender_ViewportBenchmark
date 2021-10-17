@@ -88,7 +88,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     angle_steps: FloatProperty(
         name="angle_steps",
         description="angle_steps",
-        default=1,
+        default=10,
         min = 0.01,
         soft_max=4,
         step=1,
@@ -96,6 +96,16 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         subtype='FACTOR') 
 
     
+    report_bar_width: FloatProperty(
+        name="report_bar_width",
+        description="report_bar_width",
+        default=0.5,
+        min = 0.1,
+        soft_max=2,
+        step=0.1,
+        precision=2,
+        subtype='FACTOR') 
+
     # debug mode
     debug_mode: BoolProperty(
         name="debug_mode",
