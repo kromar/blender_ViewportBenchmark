@@ -38,7 +38,7 @@ bl_info = {
     "name": "Viewport Benchmark",
     "description": "Viewport Benchmark",
     "author": "Daniel Grauer",
-    "version": (1, 0, 3),
+    "version": (1, 0, 4),
     "blender": (2, 93, 0),
     "location": "Header",
     "category": "System",
@@ -67,29 +67,19 @@ def draw_button(self, context):
 class BenchmarkModal(bpy.types.Operator):
     """Operator which runs its self from a timer"""
     bl_idname = "benchmark_modal.run"
-    bl_label = "Modal Timer Operator"  
+    bl_label = "Modal Timer Operator"
     _view_3d = None
     _modal_timer = None
-    _angle = 0  
-    _time_start = 0
     _report_bar_width = 60
     _rotation = 360
-    _benchmark_score = []
-      
-    _bench_shading_type = 0 
-    benchmarkList = [
-                    'WIREFRAME', 
-                    'SOLID', 
-                    'MATERIAL', 
-                    'RENDERED',
-                    ]
+    _benchmark_score = []      
                                 
     benchmark_config = {
         'shading_type': {
-            'WIREFRAME': {'Enabled': True, 'score':[]},
-            'SOLID': {'Enabled': True, 'score':[]},
-            'MATERIAL': {'Enabled': False, 'score':[]},
-            'RENDERED': {'Enabled': True, 'score':[]},
+            'WIREFRAME': {'Enabled': False, 'score':[]},
+            'SOLID': {'Enabled': False, 'score':[]},
+            'MATERIAL': {'Enabled': True, 'score':[]},
+            'RENDERED': {'Enabled': False, 'score':[]},
         },
 
         'object_mode': {    #bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
@@ -125,15 +115,52 @@ class BenchmarkModal(bpy.types.Operator):
         ],
               
         'show_wireframe': False,
-
     }
 
     """ @classmethod
     def poll(cls, context):
         return context.selected_objects   """
+
+    def invoke(self, context, event):  
+        #set blenders Frame Rate in the Output Properties 
+        bpy.data.scenes['Scene'].render.fps = prefs().max_render_fps  
+
+        #prepare for benchmark
+        self.view3d_fullscreen(context)   
+        bpy.ops.screen.animation_cancel()
+        #bpy.context.space_data.show_gizmo = False
+        #bpy.context.space_data.overlay.show_overlays = False 
+        
+        self.execute(context)
+        return {'RUNNING_MODAL'}
+
+
+    def execute(self, context):            
+        self._benchmark_score = [] 
+        wm = context.window_manager        
+        wm.modal_handler_add(self)
+        self._modal_timer = wm.event_timer_add(1/prefs().max_render_fps, window=context.window)
+        return {'RUNNING_MODAL'}
+   
+
+    def modal(self, context, event):  
+        if event.type in {'ESC'}:
+            self.cancel(context)
+            return {'CANCELLED'}        
+        
+        if event.type == 'TIMER':   
+            self.runBenchmark(context)
+            self.finishBenchmark(context)
+            return{'FINISHED'}
+
+        if prefs().is_interactive:
+            return {'PASS_THROUGH'}
+        else:
+            return {'RUNNING_MODAL'}
+
     
     def initializeView(self, context, value):    
-        view = bpy.context.screen.areas[0].spaces.active     
+        #view = bpy.context.screen.areas[0].spaces.active     
         self._view_3d.view_location = (0.0 , 0.0 , prefs().view_z_pos)
         self._view_3d.view_distance = prefs().view_distance 
         eul = Euler((math.radians(prefs().view_angle), 0.0 , 0.0), 'XYZ')
@@ -142,25 +169,94 @@ class BenchmarkModal(bpy.types.Operator):
 
         #rendering configs
         print("Init mode: ", value)
-        view.shading.type = value     
-        self._time_start = time.perf_counter()
+        for area in bpy.context.screen.areas: 
+            if area.type == 'VIEW_3D':
+                for space in area.spaces: 
+                    if space.type == 'VIEW_3D':
+                        space.shading.type = value  
+                           
+        #self._time_start = time.perf_counter()
         return
 
 
     def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._modal_timer)
-        bpy.ops.screen.back_to_previous()
+        #bpy.ops.screen.back_to_previous()   
+        context.window_manager.event_timer_remove(self._modal_timer)     
         return {'CANCELED'}
 
 
-    def execute(self, context):   
-        self._benchmark_score = [] 
-        wm = context.window_manager        
-        self._modal_timer = wm.event_timer_add(1/prefs().max_render_fps, window=context.window)
-        wm.modal_handler_add(self)
-        return {'RUNNING_MODAL'}
-   
+    def runBenchmark(self, context):
+        for key, value in enumerate(self.benchmark_config['shading_type']):            
+            self._angle = 0  
+            self._time_start = 0
+            if self.benchmark_config['shading_type'][value]['Enabled']:
+                if self._time_start == 0:
+                    self.initializeView(context, value)
+                    
+                while self._angle <= (self._rotation * prefs().loops):               
+                    eul = self._view_3d.view_rotation.to_euler()     
+                    eul.z = eul.z + math.radians(prefs().angle_steps)
+                    self._view_3d.view_rotation = eul.to_quaternion()
+
+                    # Update the viewport
+                    self._time_start = time.perf_counter()
+                    if bpy.ops.wm.redraw_timer.poll():     
+                        #['DRAW', 'DRAW_SWAP', 'DRAW_WIN', 'DRAW_WIN_SWAP', 'ANIM_STEP', 'ANIM_PLAY', 'UNDO']     
+                        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1) 
+                        #pass
+
+                    frame_time = (time.perf_counter() - self._time_start)
+                    self.benchmark_config['shading_type'][value]['score'].append(1/frame_time)
+
+                    if prefs().debug_mode:
+                        print(value, int(self._angle), "frame_time: ", frame_time * 1000, "ms", "fps: ", 1 / frame_time, "fps\n")
+                                
+                    
+                    self._angle += prefs().angle_steps 
+            else:
+                pass
+            
+        return {'FINISHED'} 
+
+
+    def finishBenchmark(self, context, value='WIREFRAME'):
+        #restore defaults
+        context.window_manager.event_timer_remove(self._modal_timer)
+        #self.view3d_fullscreen(context)        
+
+        """ bpy.context.space_data.show_gizmo = True
+        bpy.context.space_data.overlay.show_overlays = True    """
+
+        print("="*80, end="\n")
+        
+        #calcualte scores
+        
+        for key, value in enumerate(self.benchmark_config['shading_type']): 
+            if self.benchmark_config['shading_type'][value]['Enabled']:
+                score = sum(self.benchmark_config['shading_type'][value]['score'])
+                print("Report FPS: ", round(score/self._rotation,2))
+        
+        #calcualte scores
+        #score = sum(self.benchmark_config['shading_type'][value]['score'])
+        #print("Average FPS: ", round(score/self._rotation,2))
+        #print("Score: ", round(score,2)) 
+        #total_score = fps10+ fps11 + fps12 + fps13 + fps14                 
+        #self.CreateReport(["Total Score: " + str(round(score, 2))], "Benchmark Results", 'SHADING_RENDERED')   
+        return {'FINISHED'}
+
+
+    # Press CTRL + ALT + SPACE to leave fullscreen mode 
+    def view3d_fullscreen(self, context):
+                
+        for window in context.window_manager.windows:
+            screen = window.screen
+            for area in screen.areas:
+                if area.type == 'VIEW_3D':             
+                    self._view_3d = area.spaces.active.region_3d
+                    override = {'window': window, 'screen': screen, 'area': area}
+                    bpy.ops.screen.screen_full_area(override, use_hide_panels=True)                    
+       
+
 
     def CreateReport(self, message = [], title = "Message Box", icon = 'INFO'):
         import platform
@@ -179,96 +275,6 @@ class BenchmarkModal(bpy.types.Operator):
                 self.layout.label(text=i)
         bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)  
 
-    def modal(self, context, event):  
-        if event.type in {'ESC'}:
-            self.cancel(context)
-            context.window_manager.event_timer_remove(self._modal_timer)
-            return {'CANCELLED'}
-        
-        
-        if event.type == 'TIMER':   
-            for key, value in enumerate(self.benchmark_config['shading_type']):
-                   
-                self._angle = 0  
-                if self.benchmark_config['shading_type'][value]['Enabled']:
-                    if self._time_start == 0:
-                        self.initializeView(context, value)
-                        
-                while self._angle <= (self._rotation * prefs().loops):               
-                    eul = self._view_3d.view_rotation.to_euler()            
-                    eul.z = eul.z + math.radians(prefs().angle_steps)
-                    self._view_3d.view_rotation = eul.to_quaternion()
-
-                    self._time_start = time.perf_counter()
-                    self._angle += prefs().angle_steps 
-
-                    #print(self._angle, value, self.benchmark_config['shading_type'][value]['Enabled']) 
-                    if bpy.ops.wm.redraw_timer.poll():          
-                        bpy.ops.wm.redraw_timer(type='DRAW', iterations=1)   
-
-                    frame_time = (time.perf_counter() - self._time_start)
-                    self.benchmark_config['shading_type'][value]['score'].append(1/frame_time)
-
-                    if prefs().debug_mode==True:
-                        print(value,int(self._angle))
-                        #print("frame_time: ", frame_time * 1000, "ms")
-                        #print("fps: ", 1 / frame_time, "fps\n")            
-
-                    #print(self._angle, int(self._rotation * prefs().loops))
-                     
-                
-                #calcualte scores
-                score = sum(self.benchmark_config['shading_type'][value]['score'])
-                print("Average FPS: ", round(score/self._rotation,2))
-                print("Score: ", round(score,2)) 
-                self.CreateReport(["Average FPS: " + str(round(score/self._rotation,2)), "Score: " + str(round(score,2))], self.benchmarkList[self._bench_shading_type-1], 'SHADING_RENDERED')   
-            
-                self._time_start = 0
-            self.finishBenchmark(context)   
-            return{'FINISHED'}
-
-        if prefs().is_interactive:
-            return {'PASS_THROUGH'}
-        else:
-            return {'RUNNING_MODAL'}
-
-
-    def finishBenchmark(self, context):
-        #restore defaults
-        if bpy.ops.screen.back_to_previous.poll():
-            bpy.ops.screen.back_to_previous()
-        #context.window_manager.event_timer_remove(self._modal_timer)
-        #bpy.context.space_data.show_gizmo = True
-        #bpy.context.space_data.overlay.show_overlays = True 
-        # Example to find avearge of list
-
-        context.window_manager.event_timer_remove(self._modal_timer) 
-        print("="*80, end="\n")
-        
-        #calcualte scores
-        score = sum(self.benchmark_config['shading_type']['WIREFRAME']['score'])
-        #print("Average FPS: ", round(score/self._rotation,2))
-        #print("Score: ", round(score,2)) 
-        #total_score = fps10+ fps11 + fps12 + fps13 + fps14                 
-        self.CreateReport(["Total Score: " + str(round(score, 2))], "Benchmark Results", 'SHADING_RENDERED')   
-        return {'FINISHED'}
-
-
-    def invoke(self, context, event):         
-        for window in context.window_manager.windows:
-            screen = window.screen
-            for area in screen.areas:
-                if area.type == 'VIEW_3D':             
-                    self._view_3d = area.spaces.active.region_3d
-                    override = {'window': window, 'screen': screen, 'area': area}                    
-                    bpy.ops.screen.screen_full_area(override)       
-                    """ bpy.context.space_data.show_gizmo = False
-                    bpy.context.space_data.overlay.show_overlays = False   """
-        
-        bpy.data.scenes['Scene'].render.fps = prefs().max_render_fps
-                
-        self.execute(context)
-        return {'RUNNING_MODAL'}
 
 
 classes = (
@@ -288,4 +294,3 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-
