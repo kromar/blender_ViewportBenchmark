@@ -250,6 +250,7 @@ class BenchmarkModal(bpy.types.Operator):
                         score = sum(self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'])
                         print("Report FPS: ", shading, mode, round(score / self._rotation * prefs().angle_steps, 2))
                         report.append([shading, mode, round(score / self._rotation * prefs().angle_steps, 2)])
+                        self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].clear()
 
         import platform
         platformProcessor = platform.processor()
