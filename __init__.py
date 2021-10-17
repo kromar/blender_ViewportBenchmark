@@ -65,25 +65,23 @@ def draw_button(self, context):
     if context.region.alignment == 'RIGHT':
         layout = self.layout
         row = layout.row(align=True)                 
-        row.operator(operator="benchmark_modal.run", text="This File", icon='FUND', emboss=True, depress=False)
-        row.operator(operator="benchmark_modal.run", text="Benchy", icon='MONKEY', emboss=True, depress=False)
+        row.operator(operator="view3d.benchmark_run", text="This File", icon='FUND', emboss=True, depress=False)
+        #row.operator(operator="view3d.benchmark_run", text="Benchy", icon='MONKEY', emboss=True, depress=False)
         
 
 
 class BenchmarkModal(bpy.types.Operator):
     """Operator which runs its self from a timer"""
-    bl_idname = "benchmark_modal.run"
+    bl_idname = "view3d.benchmark_run"
     bl_label = "Modal Timer Operator"
     _view_3d = None
-    _modal_timer = None
-    _report_bar_width = 60
     _rotation = 360
     _benchmark_score = []  
                                 
     benchmark_config = {
         'shading_type': {
             'WIREFRAME': {
-                'Enabled': False, 
+                'Enabled': True, 
                 'object_mode': { 
                     'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
@@ -107,7 +105,7 @@ class BenchmarkModal(bpy.types.Operator):
                     },
             },
             'RENDERED': {
-                'Enabled': False, 
+                'Enabled': True, 
                 'object_mode': {
                     'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
@@ -233,7 +231,7 @@ class BenchmarkModal(bpy.types.Operator):
 
     def finishBenchmark(self, context, value='WIREFRAME'):
         #restore defaults
-        context.window_manager.event_timer_remove(self._modal_timer)
+        #context.window_manager.event_timer_remove(self._modal_timer)
         #self.view3d_fullscreen(context)        
 
         """ bpy.context.space_data.show_gizmo = True
@@ -264,9 +262,9 @@ class BenchmarkModal(bpy.types.Operator):
             self.layout.label(text=gpu_driver)
              
             for fps in report:                
-                bar = int(fps[2] * prefs().report_bar_width)
+                bar = int(fps[2] / prefs().loops * prefs().report_bar_width)
                 self.layout.label(text=str(fps[0] + " " + fps[1]))
-                self.layout.label(text="    |" + (bar * "=") + "| " + str(fps[2]))
+                self.layout.label(text="    |" + (bar * "=") + "| " + str(round((fps[2] / prefs().loops), 2)))
         bpy.context.window_manager.popup_menu(draw, title = "Benchmark Results", icon = 'SHADING_RENDERED') 
                 
         return {'FINISHED'}
