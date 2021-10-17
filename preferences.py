@@ -30,6 +30,36 @@ from bpy.props import ( StringProperty,
 class ViewportBenchmarkPreferences(AddonPreferences):
     bl_idname = __package__
 
+    # debug mode
+    debug_mode: BoolProperty(
+        name="debug_mode",
+        description="debug_mode",
+        default=False)
+
+
+
+    wireframe_shading: BoolProperty(
+        name="wireframe_shading",
+        description="wireframe_shading",
+        default=True)
+        
+    solid_shading: BoolProperty(
+        name="solid_shading",
+        description="solid_shading",
+        default=True)
+        
+    material_shading: BoolProperty(
+        name="material_shading",
+        description="material_shading",
+        default=True)
+        
+    rendered_shading: BoolProperty(
+        name="rendered_shading",
+        description="rendered_shading",
+        default=True)
+
+
+
     is_benchmark: BoolProperty(
         name="is_benchmark",
         description="Chose wether to run a benchmark or a stress test",
@@ -64,21 +94,21 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         step=0.1,
         precision=1,
         subtype='FACTOR') 
-
-    max_render_fps: FloatProperty(
-        name="max_render_fps",
-        description="max_render_fps",
-        default=60,
+    
+    iterations: FloatProperty(
+        name="iterations",
+        description="iterations",
+        default=1,
         min = 1,
-        soft_max=240,
+        soft_max=10,
         step=1,
         precision=0,
-        subtype='FACTOR') 
+        subtype='FACTOR')
 
     loops: FloatProperty(
         name="loops",
         description="loops",
-        default=1,
+        default=3,
         min = 1,
         soft_max=100,
         step=1,
@@ -88,13 +118,12 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     angle_steps: FloatProperty(
         name="angle_steps",
         description="angle_steps",
-        default=10,
-        min = 0.01,
-        soft_max=4,
+        default=5,
+        min = 1,
+        soft_max=10,
         step=1,
-        precision=2,
+        precision=0,
         subtype='FACTOR') 
-
     
     report_bar_width: FloatProperty(
         name="report_bar_width",
@@ -105,12 +134,6 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         step=0.1,
         precision=2,
         subtype='FACTOR') 
-
-    # debug mode
-    debug_mode: BoolProperty(
-        name="debug_mode",
-        description="debug_mode",
-        default=True)
     
     is_interactive: BoolProperty(
         name="is_interactive",
@@ -118,33 +141,32 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         default=False)    
   
     def draw(self, context):
-        
-        scene = context.scene 
         layout = self.layout        
         layout.use_property_split = True
+
+        col = layout.column(align=True)        
+        col.prop(self, 'wireframe_shading') 
+        col.prop(self, 'solid_shading') 
+        col.prop(self, 'material_shading') 
+        col.prop(self, 'rendered_shading') 
+        col.separator()
         
-        col = layout.column(align=True)
-        col.prop(self, 'max_render_fps') 
         col.prop(self, 'loops') 
         col.prop(self, 'angle_steps') 
+        col.prop(self, 'iterations') 
+        col.prop(self, 'report_bar_width') 
+        col.separator()
 
-        col = layout.column(align=True)
         col.prop(self, 'view_angle') 
         col.prop(self, 'view_distance') 
         col.prop(self, 'view_z_pos') 
 
 
         # debug mode
-        layout = self.layout  
-        col = layout.column(align=True)
+        # col.separator()
+        col.prop(self, 'is_interactive') 
         col.prop(self, 'debug_mode') 
-        if self.debug_mode:  
-            layout = self.layout  
-            col = layout.column(align=True)
-            col.prop(self, 'is_interactive') 
-            col.prop(self, 'is_benchmark') 
-
-            
+        
         row = layout.row(align=True)
         col = row.column(align=True)
 

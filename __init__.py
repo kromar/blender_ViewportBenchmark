@@ -76,7 +76,6 @@ class BenchmarkModal(bpy.types.Operator):
     bl_label = "Modal Timer Operator"
     _view_3d = None
     _rotation = 360
-    _benchmark_score = []  
                                 
     benchmark_config = {
         'shading_type': {
@@ -130,34 +129,24 @@ class BenchmarkModal(bpy.types.Operator):
         return context.selected_objects   """
 
     def invoke(self, context, event):  
-        #set blenders Frame Rate in the Output Properties 
-        bpy.data.scenes['Scene'].render.fps = prefs().max_render_fps  
-
         #prepare for benchmark
         self.view3d_fullscreen(context)   
         bpy.ops.screen.animation_cancel()
         #bpy.context.space_data.show_gizmo = False
         #bpy.context.space_data.overlay.show_overlays = False 
         
-        self.execute(context)
-        return {'RUNNING_MODAL'}
-
-
-    def execute(self, context):            
-        self._benchmark_score = [] 
         wm = context.window_manager        
         wm.modal_handler_add(self)
-        self._modal_timer = wm.event_timer_add(1/prefs().max_render_fps, window=context.window)
+        self._modal_timer = wm.event_timer_add(0.1, window=context.window)
         return {'RUNNING_MODAL'}
    
 
     def modal(self, context, event):  
         if event.type in {'ESC'}:
-            self.cancel(context)
             return {'CANCELLED'}        
         
         if event.type == 'TIMER':   
-            self.runBenchmark(context)
+            self.runBenchmark(context, event)
             self.finishBenchmark(context)
             return{'FINISHED'}
 
@@ -183,16 +172,9 @@ class BenchmarkModal(bpy.types.Operator):
                     if space.type == 'VIEW_3D':
                         space.shading.type = shading  
                         bpy.ops.object.mode_set(mode=mode)
-        return
+        
 
-
-    def cancel(self, context):
-        #bpy.ops.screen.back_to_previous()   
-        context.window_manager.event_timer_remove(self._modal_timer)     
-        return {'CANCELED'}
-
-
-    def runBenchmark(self, context):
+    def runBenchmark(self, context, event):
         for key, shading in enumerate(self.benchmark_config['shading_type']):  
             print(key, shading, self.benchmark_config['shading_type'][shading]['Enabled'])
             if self.benchmark_config['shading_type'][shading]['Enabled']:
@@ -213,25 +195,24 @@ class BenchmarkModal(bpy.types.Operator):
                             # Update the viewport
                             self._time_start = time.perf_counter()
                             if bpy.ops.wm.redraw_timer.poll():     
-                                #['DRAW', 'DRAW_SWAP', 'DRAW_WIN', 'DRAW_WIN_SWAP', 'ANIM_STEP', 'ANIM_PLAY', 'UNDO']     
-                                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1) 
-                                #pass
+                                #['DRAW', 'DRAW_SWAP', 'DRAW_WIN', 'DRAW_WIN_SWAP', 'ANIM_STEP', 'ANIM_PLAY', 'UNDO']   
+                                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=prefs().iterations) 
+
 
                             frame_time = (time.perf_counter() - self._time_start)
                             self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].append(1/frame_time)
 
                             if prefs().debug_mode:
                                 print(shading, mode, int(self._angle), "frame_time: ", frame_time * 1000, "ms", "fps: ", 1 / frame_time, "fps\n")
-                                        
                             
                             self._angle += prefs().angle_steps
+                                        
             
         return {'FINISHED'} 
 
 
     def finishBenchmark(self, context, value='WIREFRAME'):
         #restore defaults
-        #context.window_manager.event_timer_remove(self._modal_timer)
         #self.view3d_fullscreen(context)        
 
         """ bpy.context.space_data.show_gizmo = True
@@ -246,7 +227,8 @@ class BenchmarkModal(bpy.types.Operator):
                 for key, mode in enumerate(self.benchmark_config['shading_type'][shading]['object_mode']):
                     if self.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled']:
                         score = sum(self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'])
-                        print("Report FPS: ", shading, mode, round(score / self._rotation * prefs().angle_steps, 2))
+                        if not prefs().debug_mode:
+                            print("Report FPS: ", shading, mode, round(score / self._rotation * prefs().angle_steps / prefs().loops, 2))
                         report.append([shading, mode, round(score / self._rotation * prefs().angle_steps, 2)])
                         self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].clear()
 
