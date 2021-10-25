@@ -46,7 +46,7 @@ bl_info = {
     "name": "Viewport Benchmark",
     "description": "Viewport Benchmark",
     "author": "Daniel Grauer",
-    "version": (1, 0, 5),
+    "version": (1, 1, 0),
     "blender": (2, 93, 0),
     "location": "Header",
     "category": "System",
@@ -96,7 +96,7 @@ class BenchmarkModal(bpy.types.Operator):
             'SOLID': {
                 'Enabled': True, 
                 'object_mode': {
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
                     'SCULPT': {'Enabled': True, 'score':[]},
                     },
@@ -105,7 +105,7 @@ class BenchmarkModal(bpy.types.Operator):
                 'Enabled': True, 
                 'object_mode': {
                     'EDIT': {'Enabled': True, 'score':[]},
-                    'OBJECT': {'Enabled': True, 'score':[]},
+                    'OBJECT': {'Enabled': False, 'score':[]},
                     'SCULPT': {'Enabled': True, 'score':[]},
                     },
             },
@@ -114,7 +114,7 @@ class BenchmarkModal(bpy.types.Operator):
                 'object_mode': {
                     'EDIT': {'Enabled': True, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
         },
@@ -230,24 +230,44 @@ class BenchmarkModal(bpy.types.Operator):
                                         self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].append(1/frame_time)
                     
                                         self.start_angle += prefs().angle_steps
-                                else:
+                                    else:
+                                        self.mode_runs += 1
+                                        self.start_angle = 0  
+                                # skip non active modes       
+                                else:                                    
                                     pass
+                                
+                                #next mark if modes have been reached
+                                if self.mode_runs == len(self.benchmark_config['shading_type'][shading]['object_mode']):
+                                    self.shading_runs += 1
+                                    self.mode_runs = 0
+                                    self.start_angle = 0  
 
                                 # step to next benchmark
                                 if self.start_angle >= self.full_rotation:
                                     self.mode_runs += 1
                                     self.start_angle = 0
-                                    #print("MODE: ", self.shading_runs, self.mode_runs, len(self.benchmark_config['shading_type'][shading]['object_mode']) )
+                                    print("MODE: ", self.shading_runs, self.mode_runs, len(self.benchmark_config['shading_type'][shading]['object_mode']) )
+                                    
                                     #go to next shading run when all modes have been run
                                     if self.mode_runs == len(self.benchmark_config['shading_type'][shading]['object_mode']):
+                                        print()
                                         self.shading_runs += 1
                                         self.mode_runs = 0
-                                        self.start_angle = 0  
-                                        if self.shading_runs == len(self.benchmark_config['shading_type']):
-                                            self._benchEnd = True
-                                            return self._benchEnd                                 
-                                         
-    
+                                        self.start_angle = 0     
+
+                                
+                    else:
+                        self.shading_runs += 1
+                        self.mode_runs = 0
+                        self.start_angle = 0
+        
+        # finish benchmark
+        if self.shading_runs == len(self.benchmark_config['shading_type']):
+            self._benchEnd = True
+            return self._benchEnd   
+
+
     def spawnMark(self, context, event):
         time_start = time.perf_counter()             
         XYZcoord = (random.random()*100, random.random()*100, random.random()*100) 
