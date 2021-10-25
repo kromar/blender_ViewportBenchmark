@@ -23,6 +23,7 @@ from bpy.types import AddonPreferences
 from bpy.props import ( StringProperty, 
                         BoolProperty, 
                         FloatProperty,
+                        IntProperty,
                         PointerProperty,
                         EnumProperty)
 
@@ -34,9 +35,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     debug_mode: BoolProperty(
         name="debug_mode",
         description="debug_mode",
-        default=False)
-
-
+        default=True)
 
     wireframe_shading: BoolProperty(
         name="wireframe_shading",
@@ -57,8 +56,6 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         name="rendered_shading",
         description="rendered_shading",
         default=True)
-
-
 
     is_benchmark: BoolProperty(
         name="is_benchmark",
@@ -95,34 +92,40 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         precision=1,
         subtype='FACTOR') 
     
-    iterations: FloatProperty(
+    iterations: IntProperty(
         name="iterations",
         description="iterations",
         default=1,
         min = 1,
         soft_max=10,
         step=1,
-        precision=0,
         subtype='FACTOR')
 
-    loops: FloatProperty(
+    loops: IntProperty(
         name="loops",
         description="loops",
-        default=3,
+        default=1,
         min = 1,
         soft_max=100,
         step=1,
-        precision=0,
         subtype='FACTOR') 
 
-    angle_steps: FloatProperty(
+    benchmark_refresh: IntProperty(
+        name="benchmark_refresh",
+        description="benchmark_refresh",
+        default=60,
+        min = 1,
+        soft_max=100,
+        step=1,
+        subtype='FACTOR')
+
+    angle_steps: IntProperty(
         name="angle_steps",
         description="angle_steps",
-        default=5,
+        default=10,
         min = 1,
         soft_max=10,
         step=1,
-        precision=0,
         subtype='FACTOR') 
     
     report_bar_width: FloatProperty(
@@ -164,7 +167,8 @@ class ViewportBenchmarkPreferences(AddonPreferences):
 
         # debug mode
         # col.separator()
-        col.prop(self, 'is_interactive') 
+        col.prop(self, 'benchmark_refresh') 
+        #col.prop(self, 'is_interactive') 
         col.prop(self, 'debug_mode') 
         
         row = layout.row(align=True)
