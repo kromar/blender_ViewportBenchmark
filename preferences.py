@@ -35,7 +35,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     debug_mode: BoolProperty(
         name="debug_mode",
         description="debug_mode",
-        default=True)
+        default=False)
 
     wireframe_shading: BoolProperty(
         name="wireframe_shading",
