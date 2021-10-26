@@ -75,7 +75,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     view_distance: FloatProperty(
         name="view_distance",
         description="view_distance",
-        default=15.0,
+        default=50.0,
         min = 0.0,
         soft_max=100.0,
         step=0.1,
@@ -85,7 +85,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     view_z_pos: FloatProperty(
         name="view_z_pos",
         description="view_z_pos",
-        default=2.0,
+        default=6.0,
         min = 0,
         soft_max=10.0,
         step=0.1,

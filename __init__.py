@@ -140,9 +140,9 @@ class BenchmarkModal(bpy.types.Operator):
         #prepare for benchmark
         #bpy.ops.wm.window_new()
         #bpy.ops.render.view_show()
-        #bpy.ops.render.view_cancel()
-        self.view3d_fullscreen(context)   
+        #bpy.ops.render.view_cancel()  
         bpy.ops.screen.animation_cancel()
+        self.view3d_fullscreen(context) 
         #bpy.context.space_data.show_gizmo = False
         #bpy.context.space_data.overlay.show_overlays = False 
         #         
@@ -169,7 +169,7 @@ class BenchmarkModal(bpy.types.Operator):
                 self.start_angle = 0    
                 self.shading_runs = 0  
                 self.mode_runs = 0 
-                self.cancel(context)         
+                self.cancel(context)           
                 return{'FINISHED'}
             
             #self.spawnMark(context, event)            
@@ -220,7 +220,7 @@ class BenchmarkModal(bpy.types.Operator):
                                                 "run: ", self.shading_runs, "/", len(self.benchmark_config['shading_type'])) 
                                         print("mode_key: ",
                                                 "run: ", self.mode_runs, "/", len(self.benchmark_config['shading_type'][shading]['object_mode']))  
-                                                                        
+                                                           
                                     if self.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled']:
                                         # load view after full rotation
                                         if self.start_angle == 0:
@@ -272,6 +272,7 @@ class BenchmarkModal(bpy.types.Operator):
         # finish benchmark
         if self.shading_runs == len(self.benchmark_config['shading_type']):
             self._benchEnd = True
+            self.cancel(context)
             return self._benchEnd   
 
 
@@ -288,11 +289,11 @@ class BenchmarkModal(bpy.types.Operator):
         
 
     def finishBenchmark(self, context):
-        #restore defaults
-        #self.view3d_fullscreen(context)        
-
-        """ bpy.context.space_data.show_gizmo = True
-        bpy.context.space_data.overlay.show_overlays = True    """
+        #restore defaults      
+        #
+        #self.view3d_fullscreen(context)
+        #bpy.context.space_data.show_gizmo = True
+        #bpy.context.space_data.overlay.show_overlays = True
 
         print("="*80, end="\n")
         
@@ -327,8 +328,10 @@ class BenchmarkModal(bpy.types.Operator):
             layout.separator(factor=2)         
             for fps in report:
                 bar = int(fps[2] / prefs().loops * prefs().report_bar_width)
+                #self.layout.label(text=str(fps[0] + " - " + fps[1]))
+                #self.layout.label(text="    |" + (bar * "=") + "| " + str(round((fps[2] / prefs().loops), 2)))
                 self.layout.label(text=str(fps[0] + " - " + fps[1]))
-                self.layout.label(text="    |" + (bar * "=") + "| " + str(round((fps[2] / prefs().loops), 2)))
+                self.layout.label(text="    " + str(round((fps[2] / prefs().loops), 2)))
         bpy.context.window_manager.popup_menu(draw, title = "Benchmark Results", icon = 'SHADING_RENDERED') 
                       
         self.cancel(context) 
