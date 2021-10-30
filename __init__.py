@@ -324,6 +324,7 @@ class BenchmarkModal(bpy.types.Operator):
             layout.label(text=cpu)
             layout.label(text=gpu)
             layout.label(text=gpu_driver)  
+            layout.separator(factor=2)  
             layout.label(text=resolution)  
             layout.separator(factor=2)         
             for fps in report:
