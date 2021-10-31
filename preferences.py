@@ -128,14 +128,13 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         step=1,
         subtype='FACTOR') 
     
-    report_bar_width: FloatProperty(
+    report_bar_width: IntProperty(
         name="report_bar_width",
         description="report_bar_width",
-        default=0.5,
-        min = 0.1,
-        soft_max=2,
-        step=0.1,
-        precision=2,
+        default=100,
+        min = 10,
+        soft_max=100,
+        step=1,
         subtype='FACTOR') 
     
     is_interactive: BoolProperty(

@@ -26,6 +26,7 @@ else:
 import bpy
 import bgl
 import time
+import random
 from time import perf_counter 
 import math
 import mathutils
@@ -69,8 +70,6 @@ def draw_button(self, context):
         #row.operator(operator="view3d.benchmark_run", text="Benchy", icon='MONKEY', emboss=True, depress=False)
         
 
-
-import random
 class BenchmarkModal(bpy.types.Operator):
     """Operator which runs its self from a timer"""
     bl_idname = "view3d.benchmark_run"
@@ -335,7 +334,7 @@ class BenchmarkModal(bpy.types.Operator):
             layout.label(text=resolution)  
             layout.separator(factor=2)         
             for fps in report:
-                bar = int(fps[2] / prefs().loops * prefs().report_bar_width)
+                #bar = int(fps[2] / prefs().loops * prefs().report_bar_width)
                 #self.layout.label(text=str(fps[0] + " - " + fps[1]))
                 #self.layout.label(text="    |" + (bar * "=") + "| " + str(round((fps[2] / prefs().loops), 2)))
                 self.layout.label(text=str(fps[0] + " - " + fps[1]))
@@ -343,8 +342,16 @@ class BenchmarkModal(bpy.types.Operator):
 
             layout.separator(factor=2)   
             
-            layout.label(text="FPS Score: " + str(fps_score))
-            layout.label(text="Final Score: " + str(normalized_score)) 
+            bar_width = prefs().report_bar_width
+            bar_max_fps = 500
+            bar_fps_score = int(bar_width / bar_max_fps * fps_score)
+            bar_score = int(bar_width / bar_max_fps * normalized_score)
+
+            layout.label(text="FPS Score")
+            self.layout.label(text = (bar_fps_score * "|")  + (bar_width - bar_fps_score) * "-" + "| " + str(fps_score))
+            layout.label(text="Final Score")
+            self.layout.label(text = (bar_score * "|")  + (bar_width - bar_score) * "-" + "| "  + str(normalized_score))
+
 
         bpy.context.window_manager.popup_menu(draw, title = "Benchmark Results", icon = 'SHADING_RENDERED')                       
         self.cancel(context) 
