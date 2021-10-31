@@ -16,16 +16,16 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-    
-"""Addon preferences"""
+
+if "bpy" in locals():
+    import importlib
+    importlib.reload(config)
+else:
+    from . import config
+
 import bpy
 from bpy.types import AddonPreferences
-from bpy.props import ( StringProperty, 
-                        BoolProperty, 
-                        FloatProperty,
-                        IntProperty,
-                        PointerProperty,
-                        EnumProperty)
+from bpy.props import BoolProperty, IntProperty
 
 
 class ViewportBenchmarkPreferences(AddonPreferences):
@@ -33,63 +33,40 @@ class ViewportBenchmarkPreferences(AddonPreferences):
 
     # debug mode
     debug_mode: BoolProperty(
-        name="debug_mode",
-        description="debug_mode",
+        name="Debug Mode",
+        description="Debug Mode",
         default=False)
-
-    wireframe_shading: BoolProperty(
-        name="wireframe_shading",
-        description="wireframe_shading",
-        default=True)
-        
-    solid_shading: BoolProperty(
-        name="solid_shading",
-        description="solid_shading",
-        default=True)
-        
-    material_shading: BoolProperty(
-        name="material_shading",
-        description="material_shading",
-        default=True)
-        
-    rendered_shading: BoolProperty(
-        name="rendered_shading",
-        description="rendered_shading",
-        default=True)
 
     is_benchmark: BoolProperty(
         name="is_benchmark",
         description="Chose wether to run a benchmark or a stress test",
         default=True)
 
-    view_angle: FloatProperty(
+    view_angle: IntProperty(
         name="view_angle",
         description="view_angle",
         default=80,
         min = 0,
         max=180,
         step=1,
-        precision=0,
         subtype='FACTOR') 
     
-    view_distance: FloatProperty(
+    view_distance: IntProperty(
         name="view_distance",
         description="view_distance",
-        default=50.0,
-        min = 0.0,
-        soft_max=100.0,
-        step=0.1,
-        precision=1,
+        default=10,
+        min = 1,
+        soft_max=100,
+        step=1,
         subtype='FACTOR') 
 
-    view_z_pos: FloatProperty(
+    view_z_pos: IntProperty(
         name="view_z_pos",
         description="view_z_pos",
-        default=6.0,
+        default=2,
         min = 0,
-        soft_max=10.0,
-        step=0.1,
-        precision=1,
+        soft_max=10,
+        step=1,
         subtype='FACTOR') 
     
     iterations: IntProperty(
@@ -113,9 +90,9 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     benchmark_refresh: IntProperty(
         name="benchmark_refresh",
         description="benchmark_refresh",
-        default=60,
-        min = 1,
-        soft_max=100,
+        default=120,
+        min = 10,
+        soft_max=120,
         step=1,
         subtype='FACTOR')
 
@@ -150,34 +127,61 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         name="is_interactive",
         description="is_interactive",
         default=False)    
-  
+        
+
+        
+    benchmark_options: BoolProperty(
+        name="Benchmark Configuration",
+        description="Benchmark Configuration",
+        default=False)
+
+    shading_mark: BoolProperty(
+        name="shading_mark",
+        description="shading_mark",
+        default=False)  
+    
+    mode_mark: BoolProperty(
+        name="mode_mark",
+        description="mode_mark",
+        default=False)  
+               
     def draw(self, context):
         layout = self.layout        
-        layout.use_property_split = True
 
+        layout.use_property_split = False
         col = layout.column(align=True)        
-        col.prop(self, 'wireframe_shading') 
-        col.prop(self, 'solid_shading') 
-        col.prop(self, 'material_shading') 
-        col.prop(self, 'rendered_shading') 
-        col.separator()
         
-        col.prop(self, 'loops') 
-        col.prop(self, 'angle_steps') 
-        col.prop(self, 'iterations') 
-        col.prop(self, 'report_bar_width') 
-        col.separator()
+        col.prop(self, 'debug_mode') 
+        #col.prop(self, 'iterations')
+        #col.prop(self, 'is_interactive') 
+        col.prop(self, 'benchmark_refresh') 
+        #col.prop(self, 'report_bar_width') 
+        col.separator(factor=2)
 
+        col.prop(self, 'loops') 
+        col.prop(self, 'angle_steps')  
+
+        col.separator(factor=2)
         col.prop(self, 'view_angle') 
         col.prop(self, 'view_distance') 
         col.prop(self, 'view_z_pos') 
+        
+        col.separator(factor=2)
+        
+        col.prop(self, 'benchmark_options') 
+        if self.benchmark_options:
+            for key, shading in enumerate(config.benchmark_config['shading_type']):   
+                box = col.box()
+                row = box.row()
+                #row.label(text=shading + ": " + str(config.benchmark_config['shading_type'][shading]['Enabled'])) 
+                row.prop(self, 'shading_mark', text=shading)  
 
+                box = row.box()
+                for key, mode in enumerate(config.benchmark_config['shading_type'][shading]['object_mode']):
+                    #box.label(text=mode + ": " + str(config.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled'])) 
+                    box.prop(self, 'mode_mark', text=mode)  
+                    #col.prop(self, 'mode') 
 
-        # debug mode
-        # col.separator()
-        col.prop(self, 'benchmark_refresh') 
-        #col.prop(self, 'is_interactive') 
-        col.prop(self, 'debug_mode') 
         
         row = layout.row(align=True)
         col = row.column(align=True)

@@ -17,6 +17,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+
 if "bpy" in locals():
     import importlib
     importlib.reload(preferences)
@@ -30,26 +31,20 @@ import bgl
 import time
 import random
 from time import perf_counter 
+import importlib
 import math
 import mathutils
-import importlib
-from mathutils import Euler, Matrix
+from mathutils import Euler
 from bl_operators.presets import AddPresetBase
-from bpy.types import AddonPreferences, Menu, PropertyGroup, UIList, Operator, Panel 
-from bpy.props import ( StringProperty, 
-                        BoolProperty, 
-                        FloatProperty,
-                        IntProperty,
-                        EnumProperty,
-                        CollectionProperty,
-                        )
+from bpy.types import Menu, Operator, Panel 
+from bpy.props import IntProperty
 
 
 bl_info = {
     "name": "Viewport Benchmark",
     "description": "Viewport Benchmark",
     "author": "Daniel Grauer",
-    "version": (1, 1, 1),
+    "version": (1, 1, ),
     "blender": (2, 93, 0),
     "location": "Header",
     "category": "System",
