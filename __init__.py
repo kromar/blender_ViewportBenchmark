@@ -90,33 +90,33 @@ class BenchmarkModal(bpy.types.Operator):
             'WIREFRAME': {
                 'Enabled': True, 
                 'object_mode': { 
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
             'SOLID': {
                 'Enabled': True, 
                 'object_mode': {
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
             'MATERIAL': {
                 'Enabled': True, 
                 'object_mode': {
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
             'RENDERED': {
                 'Enabled': True, 
                 'object_mode': {
-                    'EDIT': {'Enabled': True, 'score':[]},
+                    'EDIT': {'Enabled': False, 'score':[]},
                     'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': True, 'score':[]},
+                    'SCULPT': {'Enabled': False, 'score':[]},
                     },
             },
         },
@@ -141,6 +141,7 @@ class BenchmarkModal(bpy.types.Operator):
         #bpy.ops.wm.window_new()
         #bpy.ops.render.view_show()
         #bpy.ops.render.view_cancel()  
+        # blender 3.0 --> bpy.ops.screen.area_close({"area": bpy.context.screen.areas[0]}).
         bpy.ops.screen.animation_cancel()
         self.view3d_fullscreen(context) 
         #bpy.context.space_data.show_gizmo = False
@@ -157,8 +158,8 @@ class BenchmarkModal(bpy.types.Operator):
 
     def modal(self, context, event):  
         if event.type in {'ESC'}:
-            self.cancel(context)
-            return {'CANCELLED'}   
+            self.cancel(context)    
+            return{'FINISHED'} 
         
         if event.type == 'TIMER':
             self._benchEnd = self.rotationMark(context, event)  
@@ -299,6 +300,7 @@ class BenchmarkModal(bpy.types.Operator):
         
         #calcualte scores
         report = []
+        total_score = []
         for key, shading in enumerate(self.benchmark_config['shading_type']):         
             if self.benchmark_config['shading_type'][shading]['Enabled']:     
                 #report.append([shading])
@@ -308,6 +310,7 @@ class BenchmarkModal(bpy.types.Operator):
                         if not prefs().debug_mode:
                             print("Report FPS: ", shading, mode, round(score / self.full_rotation * prefs().angle_steps / prefs().loops, 2))
                         report.append([shading, mode, round(score / self.full_rotation * prefs().angle_steps, 2)])
+                        total_score.append(score)
                         self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].clear()
                         
             #report.append([""])
@@ -317,8 +320,12 @@ class BenchmarkModal(bpy.types.Operator):
         cpu = str("CPU: %r" % (platformProcessor))
         gpu = str("GPU: %r" % bgl.glGetString(bgl.GL_RENDERER))
         gpu_driver = str("GPU Driver: %r" % (bgl.glGetString(bgl.GL_VERSION)))
-        resolution = "Resolution: " + str(self._width) + "x" + str(self._height)
-                
+        resolution = "Resolution: " + str(self._width) + "x" + str(self._height)                
+        normal_resolution = 1920 * 1080
+        current_resolution = self._width * self._height
+        fps_score = round(sum(total_score)/ self.full_rotation * prefs().angle_steps / len(report))
+        normalized_score = round(sum(total_score) / normal_resolution * current_resolution / self.full_rotation * prefs().angle_steps /len(report))
+
         def draw(self, context):
             layout = self.layout
             layout.label(text=cpu)
@@ -333,10 +340,14 @@ class BenchmarkModal(bpy.types.Operator):
                 #self.layout.label(text="    |" + (bar * "=") + "| " + str(round((fps[2] / prefs().loops), 2)))
                 self.layout.label(text=str(fps[0] + " - " + fps[1]))
                 self.layout.label(text="    " + str(round((fps[2] / prefs().loops), 2)))
-        bpy.context.window_manager.popup_menu(draw, title = "Benchmark Results", icon = 'SHADING_RENDERED') 
-                      
-        self.cancel(context) 
 
+            layout.separator(factor=2)   
+            
+            layout.label(text="FPS Score: " + str(fps_score))
+            layout.label(text="Final Score: " + str(normalized_score)) 
+
+        bpy.context.window_manager.popup_menu(draw, title = "Benchmark Results", icon = 'SHADING_RENDERED')                       
+        self.cancel(context) 
         return {'FINISHED'}
 
 

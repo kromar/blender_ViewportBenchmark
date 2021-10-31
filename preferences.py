@@ -122,7 +122,7 @@ class ViewportBenchmarkPreferences(AddonPreferences):
     angle_steps: IntProperty(
         name="angle_steps",
         description="angle_steps",
-        default=10,
+        default=5,
         min = 1,
         soft_max=10,
         step=1,
