@@ -136,6 +136,15 @@ class ViewportBenchmarkPreferences(AddonPreferences):
         soft_max=100,
         step=1,
         subtype='FACTOR') 
+        
+    report_bar_max_fps: IntProperty(
+        name="report_bar_max_fps",
+        description="report_bar_max_fps",
+        default=500,
+        min = 100,
+        soft_max=1000,
+        step=1,
+        subtype='FACTOR') 
     
     is_interactive: BoolProperty(
         name="is_interactive",

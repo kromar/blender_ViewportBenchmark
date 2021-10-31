@@ -20,8 +20,10 @@
 if "bpy" in locals():
     import importlib
     importlib.reload(preferences)
+    importlib.reload(config)
 else:
     from . import preferences
+    from . import config
     
 import bpy
 import bgl
@@ -47,7 +49,7 @@ bl_info = {
     "name": "Viewport Benchmark",
     "description": "Viewport Benchmark",
     "author": "Daniel Grauer",
-    "version": (1, 1, 0),
+    "version": (1, 1, 1),
     "blender": (2, 93, 0),
     "location": "Header",
     "category": "System",
@@ -83,53 +85,6 @@ class BenchmarkModal(bpy.types.Operator):
     shading_runs : IntProperty(default=0) 
     mode_runs : IntProperty(default=0) 
     full_rotation : IntProperty(default=360)  
-
-    benchmark_config = {
-        'shading_type': {
-            'WIREFRAME': {
-                'Enabled': True, 
-                'object_mode': { 
-                    'EDIT': {'Enabled': False, 'score':[]},
-                    'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': False, 'score':[]},
-                    },
-            },
-            'SOLID': {
-                'Enabled': True, 
-                'object_mode': {
-                    'EDIT': {'Enabled': False, 'score':[]},
-                    'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': False, 'score':[]},
-                    },
-            },
-            'MATERIAL': {
-                'Enabled': True, 
-                'object_mode': {
-                    'EDIT': {'Enabled': False, 'score':[]},
-                    'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': False, 'score':[]},
-                    },
-            },
-            'RENDERED': {
-                'Enabled': True, 
-                'object_mode': {
-                    'EDIT': {'Enabled': False, 'score':[]},
-                    'OBJECT': {'Enabled': True, 'score':[]},
-                    'SCULPT': {'Enabled': False, 'score':[]},
-                    },
-            },
-        },
-
-        'modifiers': [
-            'ARRAY', 
-            'BEVEL', 
-            'BOOLEAN', 
-            'MULTIRES', 
-            'SUBSURF', 
-        ],
-              
-        'show_wireframe': False,
-    }
 
     """ @classmethod
     def poll(cls, context):
@@ -205,23 +160,23 @@ class BenchmarkModal(bpy.types.Operator):
         
 
     def rotationMark(self, context, event):
-        if self.shading_runs < len(self.benchmark_config['shading_type']):
-            for shader_key, shading in enumerate(self.benchmark_config['shading_type']):  
+        if self.shading_runs < len(config.benchmark_config['shading_type']):
+            for shader_key, shading in enumerate(config.benchmark_config['shading_type']):  
                 #only run for active shading                   
                 if shader_key == self.shading_runs:  
-                    if self.benchmark_config['shading_type'][shading]['Enabled']:                              
-                        if self.mode_runs < len(self.benchmark_config['shading_type'][shading]['object_mode']):                            
-                            for mode_key, mode in enumerate(self.benchmark_config['shading_type'][shading]['object_mode']):                                     
+                    if config.benchmark_config['shading_type'][shading]['Enabled']:                              
+                        if self.mode_runs < len(config.benchmark_config['shading_type'][shading]['object_mode']):                            
+                            for mode_key, mode in enumerate(config.benchmark_config['shading_type'][shading]['object_mode']):                                     
                                 #only run for active mode
                                 if mode_key == self.mode_runs:   
                                     if prefs().debug_mode:
                                         print("\nrun: ", shading, mode, self.start_angle)                                        
                                         print("shader_key: ",
-                                                "run: ", self.shading_runs, "/", len(self.benchmark_config['shading_type'])) 
+                                                "run: ", self.shading_runs, "/", len(config.benchmark_config['shading_type'])) 
                                         print("mode_key: ",
-                                                "run: ", self.mode_runs, "/", len(self.benchmark_config['shading_type'][shading]['object_mode']))  
+                                                "run: ", self.mode_runs, "/", len(config.benchmark_config['shading_type'][shading]['object_mode']))  
                                                            
-                                    if self.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled']:
+                                    if config.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled']:
                                         # load view after full rotation
                                         if self.start_angle == 0:
                                             self.initializeView(context, shading, mode)
@@ -235,7 +190,7 @@ class BenchmarkModal(bpy.types.Operator):
                                         frame_time = (time.perf_counter() - time_start)                                          
                                         if prefs().debug_mode:  
                                             print(frame_time * 1000,  1 / frame_time)                              
-                                        self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].append(1/frame_time)
+                                        config.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].append(1/frame_time)
                     
                                         self.start_angle += prefs().angle_steps
                                     else:
@@ -246,7 +201,7 @@ class BenchmarkModal(bpy.types.Operator):
                                     pass
                                 
                                 #next mark if modes have been reached
-                                if self.mode_runs == len(self.benchmark_config['shading_type'][shading]['object_mode']):
+                                if self.mode_runs == len(config.benchmark_config['shading_type'][shading]['object_mode']):
                                     self.shading_runs += 1
                                     self.mode_runs = 0
                                     self.start_angle = 0  
@@ -256,10 +211,10 @@ class BenchmarkModal(bpy.types.Operator):
                                     self.mode_runs += 1
                                     self.start_angle = 0 
                                     if prefs().debug_mode:
-                                        print("MODE: ", self.shading_runs, self.mode_runs, len(self.benchmark_config['shading_type'][shading]['object_mode']) )
+                                        print("MODE: ", self.shading_runs, self.mode_runs, len(config.benchmark_config['shading_type'][shading]['object_mode']) )
                                     
                                     #go to next shading run when all modes have been run
-                                    if self.mode_runs == len(self.benchmark_config['shading_type'][shading]['object_mode']):
+                                    if self.mode_runs == len(config.benchmark_config['shading_type'][shading]['object_mode']):
                                         print()
                                         self.shading_runs += 1
                                         self.mode_runs = 0
@@ -270,7 +225,7 @@ class BenchmarkModal(bpy.types.Operator):
                         self.start_angle = 0
         
         # finish benchmark
-        if self.shading_runs == len(self.benchmark_config['shading_type']):
+        if self.shading_runs == len(config.benchmark_config['shading_type']):
             self._benchEnd = True
             self.cancel(context)
             return self._benchEnd   
@@ -300,17 +255,17 @@ class BenchmarkModal(bpy.types.Operator):
         #calcualte scores
         report = []
         total_score = []
-        for key, shading in enumerate(self.benchmark_config['shading_type']):         
-            if self.benchmark_config['shading_type'][shading]['Enabled']:     
+        for key, shading in enumerate(config.benchmark_config['shading_type']):         
+            if config.benchmark_config['shading_type'][shading]['Enabled']:     
                 #report.append([shading])
-                for key, mode in enumerate(self.benchmark_config['shading_type'][shading]['object_mode']):
-                    if self.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled']:
-                        score = sum(self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'])
+                for key, mode in enumerate(config.benchmark_config['shading_type'][shading]['object_mode']):
+                    if config.benchmark_config['shading_type'][shading]['object_mode'][mode]['Enabled']:
+                        score = sum(config.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'])
                         if not prefs().debug_mode:
                             print("Report FPS: ", shading, mode, round(score / self.full_rotation * prefs().angle_steps / prefs().loops, 2))
                         report.append([shading, mode, round(score / self.full_rotation * prefs().angle_steps, 2)])
                         total_score.append(score)
-                        self.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].clear()
+                        config.benchmark_config['shading_type'][shading]['object_mode'][mode]['score'].clear()
                         
             #report.append([""])
 
@@ -319,38 +274,41 @@ class BenchmarkModal(bpy.types.Operator):
         cpu = str("CPU: %r" % (platformProcessor))
         gpu = str("GPU: %r" % bgl.glGetString(bgl.GL_RENDERER))
         gpu_driver = str("GPU Driver: %r" % (bgl.glGetString(bgl.GL_VERSION)))
-        resolution = "Resolution: " + str(self._width) + "x" + str(self._height)                
-        normal_resolution = 1920 * 1080
+        resolution = str(self._width) + "x" + str(self._height)                
+        resx, resy = 1920, 1080
+        normal_resolution = resx * resy
         current_resolution = self._width * self._height
         fps_score = round(sum(total_score)/ self.full_rotation * prefs().angle_steps / len(report))
         normalized_score = round(sum(total_score) / normal_resolution * current_resolution / self.full_rotation * prefs().angle_steps /len(report))
+ 
+        def report_bar(score=0):                       
+            bar_width = prefs().report_bar_width
+            bar_max_fps = prefs().report_bar_max_fps
+            bar_fps_score = int(bar_width / bar_max_fps * score)
+            bar_score = int(bar_width / bar_max_fps * normalized_score)
+            bar = str((bar_fps_score * "|")  + (bar_width - bar_fps_score) * "-" + "| " + str(score))
+            return bar
 
         def draw(self, context):
             layout = self.layout
             layout.label(text=cpu)
             layout.label(text=gpu)
             layout.label(text=gpu_driver)  
+
             layout.separator(factor=2)  
-            layout.label(text=resolution)  
-            layout.separator(factor=2)         
+            layout.label(text="Resolution Score (" + str(resx) + "x" + str(resy) + ")")
+            self.layout.label(text = report_bar(normalized_score))
+            
+            layout.label(text="Resolution Score (" + resolution + ")")
+            self.layout.label(text = report_bar(fps_score))
+
+            layout.separator(factor=2)
             for fps in report:
-                #bar = int(fps[2] / prefs().loops * prefs().report_bar_width)
-                #self.layout.label(text=str(fps[0] + " - " + fps[1]))
-                #self.layout.label(text="    |" + (bar * "=") + "| " + str(round((fps[2] / prefs().loops), 2)))
+                print(fps[2])
                 self.layout.label(text=str(fps[0] + " - " + fps[1]))
                 self.layout.label(text="    " + str(round((fps[2] / prefs().loops), 2)))
-
-            layout.separator(factor=2)   
-            
-            bar_width = prefs().report_bar_width
-            bar_max_fps = 500
-            bar_fps_score = int(bar_width / bar_max_fps * fps_score)
-            bar_score = int(bar_width / bar_max_fps * normalized_score)
-
-            layout.label(text="FPS Score")
-            self.layout.label(text = (bar_fps_score * "|")  + (bar_width - bar_fps_score) * "-" + "| " + str(fps_score))
-            layout.label(text="Final Score")
-            self.layout.label(text = (bar_score * "|")  + (bar_width - bar_score) * "-" + "| "  + str(normalized_score))
+                bar = report_bar(fps[2])
+                self.layout.label(text = bar)
 
 
         bpy.context.window_manager.popup_menu(draw, title = "Benchmark Results", icon = 'SHADING_RENDERED')                       
