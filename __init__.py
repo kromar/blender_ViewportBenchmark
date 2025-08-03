@@ -27,7 +27,6 @@ else:
     from . import config
     
 import bpy
-import bgl
 import time
 import random
 from time import perf_counter 
@@ -54,11 +53,12 @@ bl_info = {
 
 
 def prefs():
+    """Return the preferences for the Viewport Benchmark addon."""
     user_preferences = bpy.context.preferences
     return user_preferences.addons[__package__].preferences 
 
-
 def draw_button(self, context):
+    """Draws the benchmark button in the 3D View header."""
     #if prefs().button_toggle:
     if context.region.alignment == 'RIGHT':
         layout = self.layout
@@ -150,8 +150,8 @@ class BenchmarkModal(bpy.types.Operator):
                         space.shading.type = shading                          
                         try:
                             bpy.ops.object.mode_set(mode=mode)
-                        except:
-                            pass
+                        except Exception as e:
+                            print("Error setting mode:", e)
         
 
     def rotationMark(self, context, event):
@@ -265,10 +265,26 @@ class BenchmarkModal(bpy.types.Operator):
             #report.append([""])
 
         import platform
+        import gpu
         platformProcessor = platform.processor()
         cpu = str("CPU: %r" % (platformProcessor))
-        gpu = str("GPU: %r" % bgl.glGetString(bgl.GL_RENDERER))
-        gpu_driver = str("GPU Driver: %r" % (bgl.glGetString(bgl.GL_VERSION)))
+
+        # Get vendor and renderer names
+        gpu_backend = gpu.platform.backend_type_get()
+        gpu_vendor = gpu.platform.vendor_get()
+        gpu_name = gpu.platform.renderer_get()
+        gpu_driver = gpu.platform.version_get()
+
+
+        print(f"Backend: {gpu_backend}")
+        print(f"Vendor: {gpu_vendor}")
+        print(f"Viewport GPU: {gpu_name}")
+        print(f"Driver Version: {gpu_driver}")
+        
+        gpu = f"GPU: {gpu_name!r}"
+        gpu_driver = f"GPU Driver: {gpu_driver!r}"
+
+
         resolution = str(self._width) + "x" + str(self._height)                
         resx, resy = 1920, 1080
         normal_resolution = resx * resy
